@@ -1,0 +1,244 @@
+/* frontend-excel-importer/src/App.css */
+
+/* Contenedor principal de la aplicación */
+#root {
+    max-width: 1280px; /* Ancho máximo para pantallas grandes */
+    margin: 0 auto;    /* Centra el contenedor horizontalmente */
+    padding: 1rem;     /* Reduce el padding para pantallas pequeñas */
+    text-align: center;
+    box-sizing: border-box; /* Incluye padding y borde en el ancho/alto total */
+}
+
+.container {
+    font-family: 'Inter', Arial, sans-serif; /* Usando Inter como se sugiere */
+    color: #333;
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    padding: 20px; /* Reduce el padding para pantallas pequeñas */
+    margin: 10px; /* Margen para evitar que toque los bordes en móviles */
+    box-sizing: border-box;
+}
+
+h1 {
+    color: #2c3e50;
+    margin-bottom: 20px; /* Reduce margen */
+    font-size: 2em; /* Tamaño de fuente adaptable */
+    font-weight: 700;
+}
+
+.upload-section {
+    margin-bottom: 20px;
+    padding: 20px;
+    border: 2px dashed #a0aec0; /* Borde punteado para indicar zona de carga */
+    border-radius: 10px;
+    background-color: #f7fafc;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px; /* Reduce el gap */
+    transition: all 0.3s ease;
+}
+
+.upload-section:hover {
+    border-color: #4299e1;
+    background-color: #ebf8ff;
+}
+
+.custom-file-upload {
+    display: inline-block;
+    padding: 10px 20px; /* Reduce el padding */
+    background-color: #4299e1; /* Azul vibrante */
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    font-weight: 600;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    font-size: 0.95em; /* Ajusta tamaño de fuente */
+}
+
+.custom-file-upload:hover {
+    background-color: #2b6cb0; /* Azul más oscuro al pasar el ratón */
+    transform: translateY(-2px); /* Pequeño efecto de elevación */
+}
+
+input[type="file"] {
+    display: none;
+}
+
+.file-name {
+    margin-top: 5px;
+    font-style: italic;
+    color: #555;
+    font-size: 1em; /* Ajusta tamaño de fuente */
+}
+
+/* Sección de botones de acción */
+.action-buttons-section {
+    margin-top: 20px;
+    margin-bottom: 30px;
+    display: flex;
+    justify-content: center;
+    gap: 15px; /* Espacio entre los botones */
+    flex-wrap: wrap; /* Permite que los botones se envuelvan en pantallas pequeñas */
+}
+
+.download-button, .edit-toggle-button { /* Nuevo nombre para el botón de editar */
+    padding: 10px 20px;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 600;
+    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.download-button {
+    background-color: #28a745; /* Verde para descargar */
+}
+
+.download-button:hover {
+    background-color: #218838;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+}
+
+.edit-toggle-button {
+    background-color: #ffc107; /* Amarillo para habilitar edición */
+    color: #333; /* Texto oscuro para contraste */
+}
+
+.edit-toggle-button:hover {
+    background-color: #e0a800;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Estilos para el input de edición de encabezados */
+.header-edit-input { /* Nueva clase para el input de edición de encabezados */
+    width: calc(100% - 10px); /* Ajusta el ancho */
+    padding: 3px 5px;
+    border: 1px solid #007bff;
+    border-radius: 4px;
+    font-size: inherit; /* Hereda el tamaño de fuente de la celda */
+    box-sizing: border-box; /* Importante para el padding */
+    outline: none; /* Elimina el contorno al enfocar */
+}
+
+
+.data-grid-container {
+    margin-top: 30px; /* Reduce margen */
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    background-color: #ffffff;
+}
+
+.data-grid-container h2 {
+    background-color: #edf2f7;
+    padding: 15px;
+    margin: 0;
+    border-bottom: 1px solid #e2e8f0;
+    color: #2d3748;
+    font-size: 1.5em;
+    font-weight: 600;
+}
+
+
+
+/* Estilos para react-data-grid */
+.rdg-root {
+    font-size: 13px;
+    border-radius: 8px;
+    overflow: hidden;
+    width: 100%;
+    height: auto;
+    max-height: 60vh; /* Altura máxima para la tabla, permite scroll vertical */
+}
+
+.rdg-header-row {
+    background-color: #e2e8f0;
+    font-weight: bold;
+    color: #4a5568;
+    border-bottom: 1px solid #cbd5e0;
+}
+
+.rdg-row {
+    background-color: #fff;
+    border-bottom: 1px solid #ebf4ff;
+}
+
+.rdg-row:nth-child(even) {
+    background-color: #f7fafc;
+}
+
+.rdg-cell {
+    padding: 6px 10px;
+    border-right: 1px solid #edf2f7;
+}
+
+.rdg-cell:last-child {
+    border-right: none;
+}
+
+.no-data-message {
+    margin-top: 20px;
+    color: #777;
+    font-style: italic;
+    font-size: 1em;
+    padding: 15px;
+    background-color: #f0f4f8;
+    border-radius: 8px;
+    border: 1px solid #d2dae2;
+}
+
+/* Media Queries para pantallas más pequeñas (móviles) */
+@media (max-width: 768px) {
+    #root {
+        padding: 0.5rem;
+    }
+
+    .container {
+        padding: 15px;
+        margin: 5px;
+    }
+
+    h1 {
+        font-size: 1.8em;
+    }
+
+    .custom-file-upload {
+        padding: 8px 15px;
+        font-size: 0.9em;
+    }
+
+    .action-buttons-section {
+        flex-direction: column; /* Apila los botones en móviles */
+        gap: 10px;
+    }
+    .download-button, .edit-toggle-button {
+        width: 80%; /* Ocupa más ancho */
+        margin: 0 auto; /* Centra los botones apilados */
+    }
+
+    .data-grid-container h2 {
+        font-size: 1.3em;
+        padding: 12px;
+    }
+
+    .rdg-root {
+        font-size: 12px;
+        max-height: 50vh; /* Ajusta la altura máxima para móviles */
+    }
+
+    .rdg-cell {
+        padding: 5px 8px;
+    }
+}
+
+.editable-grid .rdg-cell {
+  cursor: text !important;
+}
