@@ -1,12 +1,12 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { DataGrid, textEditor } from 'react-data-grid';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
 import 'react-data-grid/lib/styles.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
-
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 
 const downloadExcel = (data, columns, fileName) => {
   const workbook = XLSX.utils.book_new();
@@ -22,13 +22,12 @@ function App() {
   const [excelData, setExcelData] = useState([]);
   const [fileName, setFileName] = useState('');
   const [columns, setColumns] = useState([]);
-  const tableRef = useRef(null);
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    setFileName(file.name);
+    setFileName(file.name.replace(/\.[^/.]+$/, '')); // sin extensión
     const reader = new FileReader();
     reader.onload = (e) => {
       const data = new Uint8Array(e.target.result);
@@ -80,20 +79,33 @@ function App() {
     }
   };
 
-  const handleDownloadPdf = async () => {
-    if (!tableRef.current) return;
-    const canvas = await html2canvas(tableRef.current);
-    const imgData = canvas.toDataURL('image/png');
+  const handleDownloadPDF = () => {
+    if (!excelData.length || !columns.length) return alert("No hay datos para exportar.");
 
-    const pdf = new jsPDF('l', 'mm', 'a4');
-    const imgProps = pdf.getImageProperties(imgData);
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+    const doc = new jsPDF();
 
-    pdf.setFontSize(16);
-    pdf.text(`Datos del archivo: ${fileName}`, 10, 15);
-    pdf.addImage(imgData, 'PNG', 10, 25, pdfWidth - 20, pdfHeight);
-    pdf.save(`${fileName.replace(/\.[^/.]+$/, '') || 'excel_tabla'}.pdf`);
+    doc.setFontSize(14);
+    doc.text(`Tabla del archivo: ${fileName}.xlsx`, 14, 15);
+
+    const headers = columns.map(col => col.name);
+    const data = excelData.map(row => columns.map(col => row[col.key]));
+
+    autoTable(doc, {
+      head: [headers],
+      body: data,
+      startY: 25,
+      styles: {
+        fontSize: 8,
+        cellPadding: 2
+      },
+      headStyles: {
+        fillColor: [22, 160, 133],
+        textColor: 255,
+        halign: 'center'
+      }
+    });
+
+    doc.save(`${fileName}_tabla.pdf`);
   };
 
   return (
@@ -110,26 +122,23 @@ function App() {
           accept=".xlsx, .xls"
           onChange={handleFileUpload}
         />
-        {fileName && (
-          <p className="file-name">
-            Archivo seleccionado: <strong>{fileName}</strong>
-          </p>
-        )}
+        {fileName && <p className="file-name">Archivo seleccionado: <strong>{fileName}.xlsx</strong></p>}
       </div>
 
       {excelData.length > 0 && columns.length > 0 && (
         <div className="action-buttons-section">
-          <button onClick={handleDownloadEditedExcel} className="download-button">
-            Descargar Excel Editado
+          <button onClick={handleDownloadPDF} className="edit-toggle-button">
+            Descargar en Formato PDF
           </button>
-          <button onClick={handleDownloadPdf} className="edit-toggle-button">
-            Descargar como PDF
+
+          <button onClick={handleDownloadEditedExcel} className="download-button">
+            Descargar Nuevo Excel Editado
           </button>
         </div>
       )}
 
       {excelData.length > 0 && columns.length > 0 && (
-        <div className="data-grid-container" ref={tableRef}>
+        <div className="data-grid-container">
           <h2>Datos del Archivo Excel</h2>
           <DataGrid
             columns={columns}
@@ -142,7 +151,9 @@ function App() {
       )}
 
       {excelData.length === 0 && fileName && (
-        <p className="no-data-message">No se encontraron datos en el archivo o está vacío.</p>
+        <p className="no-data-message">
+          No se encontraron datos en el archivo o está vacío.
+        </p>
       )}
     </div>
   );
