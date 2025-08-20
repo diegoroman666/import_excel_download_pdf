@@ -3,6 +3,8 @@ import * as XLSX from 'xlsx';
 import { DataGrid, textEditor } from 'react-data-grid';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import Menu3D from "./components/Menu3D";
+import Graficos from "./components/Graficos";
 
 import 'react-data-grid/lib/styles.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -22,12 +24,13 @@ function App() {
   const [excelData, setExcelData] = useState([]);
   const [fileName, setFileName] = useState('');
   const [columns, setColumns] = useState([]);
+  const [activeView, setActiveView] = useState(''); // graficos | tendencia | posicion | dispersion | frecuencia
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    setFileName(file.name.replace(/\.[^/.]+$/, '')); // sin extensión
+    setFileName(file.name.replace(/\.[^/.]+$/, ''));
     const reader = new FileReader();
     reader.onload = (e) => {
       const data = new Uint8Array(e.target.result);
@@ -41,7 +44,7 @@ function App() {
 
         const gridColumns = headers.map((header, index) => ({
           key: `col${index}`,
-          name: header,
+          name: header ?? `Col ${index + 1}`,
           editable: true,
           editor: textEditor,
           resizable: true,
@@ -58,10 +61,12 @@ function App() {
 
         setColumns(gridColumns);
         setExcelData(gridRows);
+        setActiveView('graficos'); // 👉 Al cargar archivo, abre gráficos por defecto
       } else {
         setColumns([]);
         setExcelData([]);
         setFileName('');
+        setActiveView('');
       }
     };
     reader.readAsArrayBuffer(file);
@@ -83,7 +88,6 @@ function App() {
     if (!excelData.length || !columns.length) return alert("No hay datos para exportar.");
 
     const doc = new jsPDF();
-
     doc.setFontSize(14);
     doc.text(`Tabla del archivo: ${fileName}.xlsx`, 14, 15);
 
@@ -130,7 +134,6 @@ function App() {
           <button onClick={handleDownloadPDF} className="edit-toggle-button">
             Descargar en Formato PDF
           </button>
-
           <button onClick={handleDownloadEditedExcel} className="download-button">
             Descargar Nuevo Excel Editado
           </button>
@@ -138,16 +141,57 @@ function App() {
       )}
 
       {excelData.length > 0 && columns.length > 0 && (
-        <div className="data-grid-container">
-          <h2>Datos del Archivo Excel</h2>
-          <DataGrid
-            columns={columns}
-            rows={excelData}
-            onRowsChange={onRowsChange}
-            enableVirtualization
-            minHeight={400}
-          />
-        </div>
+        <>
+          <div className="data-grid-container">
+            <h2>Datos del Archivo Excel</h2>
+            <DataGrid
+              columns={columns}
+              rows={excelData}
+              onRowsChange={onRowsChange}
+              enableVirtualization
+              minHeight={400}
+            />
+          </div>
+
+          {/* Título + menú */}
+          <div className="analysis-section">
+            <h2 className="analysis-title">📊 Aquí están los datos que necesitas</h2>
+            <Menu3D activeView={activeView} setActiveView={setActiveView} />
+          </div>
+
+          {/* Panel de resultados (estilo iframe-like) */}
+          <div className="results-section" style={{ marginTop: 20 }}>
+            {activeView === 'graficos' && (
+              <div className="iframe-container">
+                <Graficos data={excelData} columns={columns} />
+              </div>
+            )}
+
+            {activeView === 'tendencia' && (
+              <div className="iframe-container placeholder">
+                Próximamente: Medidas de Tendencia Central
+              </div>
+            )}
+
+            {activeView === 'posicion' && (
+              <div className="iframe-container placeholder">
+                Próximamente: Medidas de Posición
+              </div>
+            )}
+
+            {activeView === 'dispersion' && (
+              <div className="iframe-container placeholder">
+                Próximamente: Medidas de Dispersión
+              </div>
+            )}
+
+            {activeView === 'frecuencia' && (
+              <div className="iframe-container placeholder">
+                Próximamente: Tabla de Frecuencias
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       {excelData.length === 0 && fileName && (
