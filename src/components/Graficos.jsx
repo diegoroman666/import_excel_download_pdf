@@ -1,3 +1,4 @@
+// src/components/Graficos.jsx
 import React, { useMemo } from "react";
 import "./Graficos.css";
 import {
@@ -5,13 +6,12 @@ import {
   PieChart, Pie, Cell, Legend
 } from "recharts";
 
-// Utilidad: intenta convertir a número (admite "1.234,56" y "1,234.56")
+// Utilidad para convertir valores a número
 function toNumber(val) {
   if (val === null || val === undefined) return NaN;
   if (typeof val === "number") return val;
   const s = String(val).trim();
   if (!s) return NaN;
-  // normaliza decimales con coma
   const norm = s.replace(/\./g, "").replace(",", ".");
   const n = parseFloat(norm);
   return Number.isNaN(n) ? parseFloat(s) : n;
@@ -29,18 +29,16 @@ function getNumericColumnKeys(data, columns, sampleSize = 100, threshold = 0.6) 
       const v = data[i]?.[key];
       if (!Number.isNaN(toNumber(v))) countNumeric++;
     }
-    if (max > 0 && countNumeric / max >= threshold) {
-      numericKeys.push(key);
-    }
+    if (max > 0 && countNumeric / max >= threshold) numericKeys.push(key);
   }
   return numericKeys;
 }
 
-// Elige una columna categórica (no numérica) si existe, si no usa el índice
+// Elige una columna categórica (no numérica) si existe
 function getCategoryKey(data, columns, numericKeys) {
   const nonNumeric = columns.map(c => c.key).filter(k => !numericKeys.includes(k));
   if (nonNumeric.length > 0) return nonNumeric[0];
-  return null; // forzaremos histograma si no hay categórica
+  return null;
 }
 
 // Agrega por categoría (suma)
@@ -55,27 +53,23 @@ function aggregateByCategory(data, catKey, valKey) {
     }
   }
   const arr = Array.from(map, ([name, value]) => ({ name, value }));
-  // limita a top 12 para legibilidad
   arr.sort((a,b) => b.value - a.value);
   return arr.slice(0, 12);
 }
 
-// Genera bins para histograma (si no hay categórica)
+// Genera bins para histograma
 function histogram(data, valKey, bins = 8) {
   const values = data.map(r => toNumber(r?.[valKey])).filter(v => !Number.isNaN(v));
   if (values.length === 0) return [];
   const min = Math.min(...values);
   const max = Math.max(...values);
-  if (min === max) {
-    // todos iguales → un solo bin
-    return [{ name: `${min}`, value: values.length }];
-  }
+  if (min === max) return [{ name: `${min}`, value: values.length }];
   const width = (max - min) / bins;
-  const result = Array.from({ length: bins }, (_, i) => {
-    const from = min + i * width;
-    const to = i === bins - 1 ? max : from + width;
-    return { from, to, count: 0 };
-  });
+  const result = Array.from({ length: bins }, (_, i) => ({
+    from: min + i * width,
+    to: i === bins - 1 ? max : min + (i+1) * width,
+    count: 0
+  }));
   for (const v of values) {
     const idx = Math.min(Math.floor((v - min) / width), bins - 1);
     result[idx].count++;
@@ -92,19 +86,19 @@ const COLORS = [
   "#6b83b7","#73c2b0"
 ];
 
-function Graficos({ data, columns }) {
-  // Computa datasets en función de data/columns
+function Graficos({ data, columns, selectedColumn }) {
   const { barData, pieData, xLabel, yLabel, mode } = useMemo(() => {
     if (!data || !columns || data.length === 0 || columns.length === 0) {
       return { barData: [], pieData: [], xLabel: "", yLabel: "", mode: "empty" };
     }
 
     const numericKeys = getNumericColumnKeys(data, columns);
-    // label de columnas
     const byKey = new Map(columns.map(c => [c.key, c.name || c.key]));
 
-    if (numericKeys.length === 0) {
-      // Sin numéricas → conteo por primera columna como categorías
+    // Si se ha seleccionado columna y es numérica → usamos selectedColumn
+    let yKey = selectedColumn && numericKeys.includes(selectedColumn) ? selectedColumn : numericKeys[0] || null;
+    if (!yKey) {
+      // No hay columna numérica → contar por primera columna
       const catKey = columns[0].key;
       const countMap = new Map();
       for (const r of data) {
@@ -114,41 +108,20 @@ function Graficos({ data, columns }) {
       const arr = Array.from(countMap, ([name, value]) => ({ name, value }))
         .sort((a,b)=>b.value-a.value)
         .slice(0, 12);
-      return {
-        barData: arr,
-        pieData: arr,
-        xLabel: byKey.get(catKey),
-        yLabel: "Conteo",
-        mode: "count"
-      };
+      return { barData: arr, pieData: arr, xLabel: byKey.get(catKey), yLabel: "Conteo", mode: "count" };
     }
 
-    // Tenemos numéricas: usamos la primera para Y
-    const yKey = numericKeys[0];
     const catKey = getCategoryKey(data, columns, numericKeys);
-
     if (catKey) {
-      // Agregar por categoría
       const agg = aggregateByCategory(data, catKey, yKey);
-      return {
-        barData: agg,
-        pieData: agg,
-        xLabel: byKey.get(catKey),
-        yLabel: byKey.get(yKey),
-        mode: "cat-sum"
-      };
+      return { barData: agg, pieData: agg, xLabel: byKey.get(catKey), yLabel: byKey.get(yKey), mode: "cat-sum" };
     } else {
-      // Sin categóricas → histograma de la numérica
       const hist = histogram(data, yKey, 8);
-      return {
-        barData: hist,
-        pieData: hist,
-        xLabel: byKey.get(yKey) + " (bins)",
-        yLabel: "Conteo",
-        mode: "hist"
-      };
+      return { barData: hist, pieData: hist, xLabel: byKey.get(yKey) + " (bins)", yLabel: "Conteo", mode: "hist" };
     }
-  }, [data, columns]);
+  }, [data, columns, selectedColumn]);
+
+  if (!barData.length) return <p>No hay datos numéricos disponibles para la columna seleccionada.</p>;
 
   return (
     <div className="graficos-container">
@@ -170,7 +143,7 @@ function Graficos({ data, columns }) {
               <XAxis dataKey="name" tick={{ fontSize: 12 }} interval={0} angle={0} height={50} />
               <YAxis />
               <Tooltip />
-              <Bar dataKey="value" animationDuration={700} />
+              <Bar dataKey="value" animationDuration={700} fill="#4e79a7" />
             </BarChart>
           </ResponsiveContainer>
           <div className="axis-notes">

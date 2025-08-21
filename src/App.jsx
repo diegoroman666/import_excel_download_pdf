@@ -1,3 +1,4 @@
+// src/App.jsx
 import React, { useState, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { DataGrid, textEditor } from 'react-data-grid';
@@ -6,7 +7,6 @@ import autoTable from 'jspdf-autotable';
 import Menu3D from "./components/Menu3D";
 import Graficos from "./components/Graficos";
 
-// Importaciones para el análisis de datos
 import { calculateMean, calculateMedian, calculateMode } from './data/MTC';
 import { calculatePercentile, calculateQuartiles, calculateDeciles } from './data/MTP';
 import { calculateRange, calculateVariance, calculateStandardDeviation, calculateCoefficientOfVariation } from './data/Disper';
@@ -30,7 +30,8 @@ function App() {
   const [excelData, setExcelData] = useState([]);
   const [fileName, setFileName] = useState('');
   const [columns, setColumns] = useState([]);
-  const [activeView, setActiveView] = useState(''); // graficos | tendencia | posicion | dispersion | frecuencia
+  const [activeView, setActiveView] = useState('graficos');
+  const [selectedColumn, setSelectedColumn] = useState('');
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
@@ -67,36 +68,26 @@ function App() {
 
         setColumns(gridColumns);
         setExcelData(gridRows);
+        setSelectedColumn(gridColumns[0]?.key || '');
         setActiveView('graficos');
       } else {
         setColumns([]);
         setExcelData([]);
         setFileName('');
-        setActiveView('');
+        setSelectedColumn('');
       }
     };
     reader.readAsArrayBuffer(file);
   };
 
-  const onRowsChange = useCallback((updatedRows) => {
-    setExcelData(updatedRows);
-  }, []);
+  const onRowsChange = useCallback((updatedRows) => setExcelData(updatedRows), []);
 
   const handleDownloadEditedExcel = () => {
-    if (excelData.length > 0 && columns.length > 0) {
-      downloadExcel(excelData, columns, fileName);
-    } else {
-      // Usar una modal o mensaje personalizado en lugar de alert()
-      console.log("No hay datos para exportar.");
-    }
+    if (excelData.length && columns.length) downloadExcel(excelData, columns, fileName);
   };
 
   const handleDownloadPDF = () => {
-    if (!excelData.length || !columns.length) {
-      // Usar una modal o mensaje personalizado en lugar de alert()
-      console.log("No hay datos para exportar.");
-      return;
-    }
+    if (!excelData.length || !columns.length) return;
 
     const doc = new jsPDF();
     doc.setFontSize(14);
@@ -109,105 +100,59 @@ function App() {
       head: [headers],
       body: data,
       startY: 25,
-      styles: {
-        fontSize: 8,
-        cellPadding: 2
-      },
-      headStyles: {
-        fillColor: [22, 160, 133],
-        textColor: 255,
-        halign: 'center'
-      }
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [22, 160, 133], textColor: 255, halign: 'center' }
     });
 
     doc.save(`${fileName}_tabla.pdf`);
   };
 
-  // --- Lógica de análisis de datos integrada ---
   const numericData = useMemo(() => {
-    if (!excelData.length || !columns.length) {
-      return [];
-    }
-    // Encuentra la primera columna numérica para el análisis
-    const numericKeys = columns.filter(col => {
-      const sample = excelData.slice(0, 100);
-      let numericCount = 0;
-      for (const row of sample) {
-        if (!isNaN(parseFloat(row[col.key]))) {
-          numericCount++;
-        }
-      }
-      return numericCount / sample.length > 0.6;
-    }).map(col => col.key);
+    if (!excelData.length || !columns.length || !selectedColumn) return [];
+    return excelData
+      .map(row => parseFloat(row[selectedColumn]))
+      .filter(v => !isNaN(v));
+  }, [excelData, columns, selectedColumn]);
 
-    if (numericKeys.length > 0) {
-      const firstNumericKey = numericKeys[0];
-      return excelData.map(row => parseFloat(row[firstNumericKey])).filter(v => !isNaN(v));
-    }
-    return [];
-  }, [excelData, columns]);
+  const mtcResults = useMemo(() => numericData.length ? {
+    mean: calculateMean(numericData),
+    median: calculateMedian(numericData),
+    mode: calculateMode(numericData),
+  } : null, [numericData]);
 
-  const mtcResults = useMemo(() => {
-    if (numericData.length > 0) {
-      return {
-        mean: calculateMean(numericData),
-        median: calculateMedian(numericData),
-        mode: calculateMode(numericData),
-      };
-    }
-    return null;
-  }, [numericData]);
+  const mtpResults = useMemo(() => numericData.length ? {
+    percentiles: {
+      p25: calculatePercentile(numericData, 25),
+      p50: calculatePercentile(numericData, 50),
+      p75: calculatePercentile(numericData, 75)
+    },
+    quartiles: calculateQuartiles(numericData),
+    deciles: calculateDeciles(numericData)
+  } : null, [numericData]);
 
-  const mtpResults = useMemo(() => {
-    if (numericData.length > 0) {
-      return {
-        percentiles: {
-          p25: calculatePercentile(numericData, 25),
-          p50: calculatePercentile(numericData, 50),
-          p75: calculatePercentile(numericData, 75)
-        },
-        quartiles: calculateQuartiles(numericData),
-        deciles: calculateDeciles(numericData)
-      };
-    }
-    return null;
-  }, [numericData]);
-
-  const disperResults = useMemo(() => {
-    if (numericData.length > 0) {
-      return {
-        range: calculateRange(numericData),
-        variance: calculateVariance(numericData),
-        standardDeviation: calculateStandardDeviation(numericData),
-        coefficientOfVariation: calculateCoefficientOfVariation(numericData),
-      };
-    }
-    return null;
-  }, [numericData]);
+  const disperResults = useMemo(() => numericData.length ? {
+    range: calculateRange(numericData),
+    variance: calculateVariance(numericData),
+    standardDeviation: calculateStandardDeviation(numericData),
+    coefficientOfVariation: calculateCoefficientOfVariation(numericData),
+  } : null, [numericData]);
 
   const frecuenciaResults = useMemo(() => {
-    if (columns.length > 0) {
-      const firstColumnKey = columns[0].key;
-      const firstColumnData = excelData.map(row => row[firstColumnKey]);
-      const isNumeric = firstColumnData.every(val => !isNaN(parseFloat(val)));
+    if (!columns.length || !selectedColumn) return null;
+    const columnData = excelData.map(row => row[selectedColumn]);
+    const isNumeric = columnData.every(val => !isNaN(parseFloat(val)));
+    return {
+      ungroupedTable: createUngroupedFrequencyTable(columnData),
+      groupedTable: isNumeric ? createGroupedFrequencyTable(columnData) : null,
+    };
+  }, [excelData, columns, selectedColumn]);
 
-      return {
-        ungroupedTable: createUngroupedFrequencyTable(firstColumnData),
-        groupedTable: isNumeric ? createGroupedFrequencyTable(firstColumnData) : null,
-      };
-    }
-    return null;
-  }, [excelData, columns]);
-
-  // --- Componentes para renderizar los resultados ---
   const renderAnalysisContent = () => {
-    if (!excelData.length) {
-      return null;
-    }
+    if (!excelData.length || !selectedColumn) return null;
 
     switch (activeView) {
       case 'graficos':
-        return <Graficos data={excelData} columns={columns} />;
+        return <Graficos data={excelData} columns={columns} selectedColumn={selectedColumn} />;
 
       case 'tendencia':
         return (
@@ -215,13 +160,11 @@ function App() {
             <h3>Medidas de Tendencia Central</h3>
             {mtcResults ? (
               <div className="analysis-card">
-                <p><strong>Media:</strong> {mtcResults.mean ? mtcResults.mean.toFixed(2) : 'N/A'}</p>
-                <p><strong>Mediana:</strong> {mtcResults.median ? mtcResults.median.toFixed(2) : 'N/A'}</p>
-                <p><strong>Moda:</strong> {mtcResults.mode ? mtcResults.mode.map(m => m.toFixed(2)).join(', ') : 'N/A'}</p>
+                <p><strong>Media:</strong> {mtcResults.mean?.toFixed(2)}</p>
+                <p><strong>Mediana:</strong> {mtcResults.median?.toFixed(2)}</p>
+                <p><strong>Moda:</strong> {mtcResults.mode?.map(m => m.toFixed(2)).join(', ')}</p>
               </div>
-            ) : (
-              <p>No se encontraron datos numéricos para calcular las medidas de tendencia central.</p>
-            )}
+            ) : <p>No hay datos numéricos.</p>}
           </div>
         );
 
@@ -233,9 +176,9 @@ function App() {
               <>
                 <div className="analysis-card">
                   <h4>Cuartiles</h4>
-                  <p><strong>Q1 (Percentil 25):</strong> {mtpResults.quartiles.q1.toFixed(2)}</p>
-                  <p><strong>Q2 (Percentil 50):</strong> {mtpResults.quartiles.q2.toFixed(2)}</p>
-                  <p><strong>Q3 (Percentil 75):</strong> {mtpResults.quartiles.q3.toFixed(2)}</p>
+                  <p><strong>Q1 (P25):</strong> {mtpResults.quartiles.q1.toFixed(2)}</p>
+                  <p><strong>Q2 (P50):</strong> {mtpResults.quartiles.q2.toFixed(2)}</p>
+                  <p><strong>Q3 (P75):</strong> {mtpResults.quartiles.q3.toFixed(2)}</p>
                 </div>
                 <div className="analysis-card">
                   <h4>Deciles</h4>
@@ -246,9 +189,7 @@ function App() {
                   </ul>
                 </div>
               </>
-            ) : (
-              <p>No se encontraron datos numéricos para calcular las medidas de posición.</p>
-            )}
+            ) : <p>No hay datos numéricos.</p>}
           </div>
         );
 
@@ -258,14 +199,12 @@ function App() {
             <h3>Medidas de Dispersión</h3>
             {disperResults ? (
               <div className="analysis-card">
-                <p><strong>Rango:</strong> {disperResults.range ? disperResults.range.toFixed(2) : 'N/A'}</p>
-                <p><strong>Varianza:</strong> {disperResults.variance ? disperResults.variance.toFixed(2) : 'N/A'}</p>
-                <p><strong>Desviación Estándar:</strong> {disperResults.standardDeviation ? disperResults.standardDeviation.toFixed(2) : 'N/A'}</p>
-                <p><strong>Coeficiente de Variación:</strong> {disperResults.coefficientOfVariation ? disperResults.coefficientOfVariation.toFixed(2) : 'N/A'}</p>
+                <p><strong>Rango:</strong> {disperResults.range?.toFixed(2)}</p>
+                <p><strong>Varianza:</strong> {disperResults.variance?.toFixed(2)}</p>
+                <p><strong>Desviación Estándar:</strong> {disperResults.standardDeviation?.toFixed(2)}</p>
+                <p><strong>Coeficiente de Variación:</strong> {disperResults.coefficientOfVariation?.toFixed(2)}</p>
               </div>
-            ) : (
-              <p>No se encontraron datos numéricos para calcular las medidas de dispersión.</p>
-            )}
+            ) : <p>No hay datos numéricos.</p>}
           </div>
         );
 
@@ -275,7 +214,7 @@ function App() {
             <h3>Tablas de Frecuencia</h3>
             {frecuenciaResults ? (
               <>
-                <h4>Tabla de Frecuencia no Agrupada</h4>
+                <h4>Tabla No Agrupada</h4>
                 {frecuenciaResults.ungroupedTable.length > 0 ? (
                   <div className="table-wrapper">
                     <table>
@@ -284,13 +223,13 @@ function App() {
                           <th>Valor</th>
                           <th>Frecuencia Absoluta</th>
                           <th>Frecuencia Relativa</th>
-                          <th>Frecuencia Acumulada</th>
-                          <th>Frecuencia Relativa Acumulada</th>
+                          <th>Acumulada</th>
+                          <th>Relativa Acumulada</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {frecuenciaResults.ungroupedTable.map((row, index) => (
-                          <tr key={index}>
+                        {frecuenciaResults.ungroupedTable.map((row, i) => (
+                          <tr key={i}>
                             <td>{row.value}</td>
                             <td>{row.absoluteFrequency}</td>
                             <td>{row.relativeFrequency}</td>
@@ -301,28 +240,25 @@ function App() {
                       </tbody>
                     </table>
                   </div>
-                ) : (
-                  <p>No se encontraron datos para la tabla de frecuencia no agrupada.</p>
-                )}
-
+                ) : <p>No hay datos.</p>}
                 {frecuenciaResults.groupedTable && (
                   <>
-                    <h4>Tabla de Frecuencia Agrupada</h4>
+                    <h4>Tabla Agrupada</h4>
                     <div className="table-wrapper">
                       <table>
                         <thead>
                           <tr>
                             <th>Intervalo</th>
                             <th>Marca de Clase</th>
-                            <th>Frecuencia Absoluta</th>
-                            <th>Frecuencia Relativa</th>
-                            <th>Frecuencia Acumulada</th>
-                            <th>Frecuencia Relativa Acumulada</th>
+                            <th>Frec. Abs</th>
+                            <th>Frec. Rel</th>
+                            <th>Frec. Acum</th>
+                            <th>Frec. Rel Acum</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {frecuenciaResults.groupedTable.map((row, index) => (
-                            <tr key={index}>
+                          {frecuenciaResults.groupedTable.map((row, i) => (
+                            <tr key={i}>
                               <td>{row.interval}</td>
                               <td>{row.classMark}</td>
                               <td>{row.absoluteFrequency}</td>
@@ -337,9 +273,7 @@ function App() {
                   </>
                 )}
               </>
-            ) : (
-              <p>No se encontraron datos para generar las tablas de frecuencia.</p>
-            )}
+            ) : <p>No hay datos para tablas de frecuencia.</p>}
           </div>
         );
 
@@ -350,62 +284,70 @@ function App() {
 
   return (
     <div className="container">
-      <h1>Importador y Visualizador de Archivos Excel</h1>
+      <h1>Importador y Analizador Científico de Excel</h1>
 
+      {/* BOTÓN ÚNICO PARA SUBIR ARCHIVO */}
       <div className="upload-section">
-        <label htmlFor="file-upload" className="custom-file-upload">
-          Seleccionar Archivo Excel
-        </label>
+        <label htmlFor="file-upload" className="custom-file-upload">Seleccionar Archivo Excel</label>
         <input
           id="file-upload"
           type="file"
           accept=".xlsx, .xls"
           onChange={handleFileUpload}
+          style={{ display: 'none' }}
         />
         {fileName && <p className="file-name">Archivo seleccionado: <strong>{fileName}.xlsx</strong></p>}
       </div>
 
-      {excelData.length > 0 && columns.length > 0 && (
-        <div className="action-buttons-section">
-          <button onClick={handleDownloadPDF} className="edit-toggle-button">
-            Descargar en Formato PDF
-          </button>
-          <button onClick={handleDownloadEditedExcel} className="download-button">
-            Descargar Nuevo Excel Editado
-          </button>
+      {/* SELECTOR DE COLUMNA */}
+      {columns.length > 0 && (
+        <div className="column-selector">
+          <label htmlFor="column-select">Seleccionar Columna para Análisis/Grafico:</label>
+          <select
+            id="column-select"
+            value={selectedColumn}
+            onChange={(e) => setSelectedColumn(e.target.value)}
+          >
+            {columns.map(col => <option key={col.key} value={col.key}>{col.name}</option>)}
+          </select>
         </div>
       )}
 
-      {excelData.length > 0 && columns.length > 0 && (
-        <>
-          <div className="data-grid-container">
-            <h2>Datos del Archivo Excel</h2>
-            <DataGrid
-              columns={columns}
-              rows={excelData}
-              onRowsChange={onRowsChange}
-              enableVirtualization
-              minHeight={400}
-            />
-          </div>
+      {/* BOTONES DE DESCARGA */}
+      {excelData.length && columns.length && (
+        <div className="action-buttons-section">
+          <button onClick={handleDownloadPDF} className="edit-toggle-button">Descargar PDF</button>
+          <button onClick={handleDownloadEditedExcel} className="download-button">Descargar Excel</button>
+        </div>
+      )}
 
-          {/* Título + menú */}
+      {/* DATA GRID */}
+      {excelData.length && columns.length && (
+        <div className="data-grid-container">
+          <h2>Datos del Archivo Excel</h2>
+          <DataGrid
+            columns={columns}
+            rows={excelData}
+            onRowsChange={onRowsChange}
+            enableVirtualization
+            minHeight={400}
+          />
+        </div>
+      )}
+
+      {/* SECCIÓN DE ANÁLISIS */}
+      {excelData.length && columns.length && (
+        <>
           <div className="analysis-section">
-            <h2 className="analysis-title">📊 Aquí están los datos que necesitas</h2>
+            <h2 className="analysis-title">📊 Panel de Análisis</h2>
             <Menu3D activeView={activeView} setActiveView={setActiveView} />
           </div>
-
-          {/* Panel de resultados con contenido dinámico */}
-          <div className="results-section" style={{ marginTop: 20 }}>
-            {renderAnalysisContent()}
-          </div>
+          <div className="results-section">{renderAnalysisContent()}</div>
         </>
       )}
 
       {excelData.length === 0 && fileName && (
-        <p className="no-data-message">
-          No se encontraron datos en el archivo o está vacío.
-        </p>
+        <p className="no-data-message">No se encontraron datos en el archivo.</p>
       )}
     </div>
   );

@@ -1,244 +1,245 @@
-/* frontend-excel-importer/src/App.css */
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Roboto:wght@400;700&display=swap');
 
-/* Contenedor principal de la aplicación */
-#root {
-    max-width: 1280px; /* Ancho máximo para pantallas grandes */
-    margin: 0 auto;    /* Centra el contenedor horizontalmente */
-    padding: 1rem;     /* Reduce el padding para pantallas pequeñas */
-    text-align: center;
-    box-sizing: border-box; /* Incluye padding y borde en el ancho/alto total */
+:root {
+  --primary-color: #1F618D; /* Azul profundo */
+  --secondary-color: #117A65; /* Verde serio */
+  --accent-color: #F39C12; /* Amarillo para resaltar */
+  --bg-color: #F4F6F6; /* Gris muy claro */
+  --card-bg: rgba(255, 255, 255, 0.95);
+  --text-color-dark: #212F3C;
+  --text-color-light: #FDFEFE;
+  --table-header-bg: #1C2833;
+  --table-header-text: #FDFEFE;
+  --table-row-bg: #FBFCFC;
+  --table-row-hover: #D6EAF8;
+  --table-border: #ABB2B9;
+  --button-bg: linear-gradient(135deg, #1F618D, #117A65);
+  --button-hover: linear-gradient(135deg, #117A65, #1F618D);
+  --button-active: #117A65;
+  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+}
+
+body {
+  font-family: 'Roboto', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color-dark);
+  margin: 0;
+  padding: 0;
 }
 
 .container {
-    font-family: 'Inter', Arial, sans-serif; /* Usando Inter como se sugiere */
-    color: #333;
-    background-color: #ffffff;
-    border-radius: 12px;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-    padding: 20px; /* Reduce el padding para pantallas pequeñas */
-    margin: 10px; /* Margen para evitar que toque los bordes en móviles */
-    box-sizing: border-box;
+  width: 95%;
+  max-width: 1400px;
+  margin: 40px auto;
+  padding: 30px;
+  background: var(--card-bg);
+  border-radius: 20px;
+  box-shadow: var(--glass-shadow);
 }
 
 h1 {
-    color: #2c3e50;
-    margin-bottom: 20px; /* Reduce margen */
-    font-size: 2em; /* Tamaño de fuente adaptable */
-    font-weight: 700;
+  text-align: center;
+  font-family: 'Roboto Mono', monospace;
+  color: var(--primary-color);
+  font-size: 2.5rem;
+  margin-bottom: 40px;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
 }
 
 .upload-section {
-    margin-bottom: 20px;
-    padding: 20px;
-    border: 2px dashed #a0aec0; /* Borde punteado para indicar zona de carga */
-    border-radius: 10px;
-    background-color: #f7fafc;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 15px; /* Reduce el gap */
-    transition: all 0.3s ease;
-}
-
-.upload-section:hover {
-    border-color: #4299e1;
-    background-color: #ebf8ff;
+  text-align: center;
+  margin-bottom: 30px;
 }
 
 .custom-file-upload {
-    display: inline-block;
-    padding: 10px 20px; /* Reduce el padding */
-    background-color: #4299e1; /* Azul vibrante */
-    color: white;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
-    font-weight: 600;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    font-size: 0.95em; /* Ajusta tamaño de fuente */
+  cursor: pointer;
+  background: var(--button-bg);
+  color: var(--text-color-light);
+  padding: 18px 40px;
+  border-radius: 40px;
+  font-weight: 700;
+  font-size: 1rem;
+  transition: all 0.4s;
+  display: inline-block;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
-
 .custom-file-upload:hover {
-    background-color: #2b6cb0; /* Azul más oscuro al pasar el ratón */
-    transform: translateY(-2px); /* Pequeño efecto de elevación */
-}
-
-input[type="file"] {
-    display: none;
+  background: var(--button-hover);
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
 }
 
 .file-name {
-    margin-top: 5px;
-    font-style: italic;
-    color: #555;
-    font-size: 1em; /* Ajusta tamaño de fuente */
+  margin-top: 10px;
+  font-style: italic;
+  color: #566573;
+}
+.file-name strong {
+  color: var(--accent-color);
+  font-weight: 700;
 }
 
-/* Sección de botones de acción */
 .action-buttons-section {
-    margin-top: 20px;
-    margin-bottom: 30px;
-    display: flex;
-    justify-content: center;
-    gap: 15px; /* Espacio entre los botones */
-    flex-wrap: wrap; /* Permite que los botones se envuelvan en pantallas pequeñas */
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-bottom: 30px;
 }
 
-.download-button, .edit-toggle-button { /* Nuevo nombre para el botón de editar */
-    padding: 10px 20px;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 1em;
-    font-weight: 600;
-    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
+.edit-toggle-button,
 .download-button {
-    background-color: #28a745; /* Verde para descargar */
+  padding: 15px 30px;
+  border: none;
+  border-radius: 30px;
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--text-color-light);
+  font-size: 1rem;
+  background: var(--button-bg);
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
-
+.edit-toggle-button:hover,
 .download-button:hover {
-    background-color: #218838;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+  background: var(--button-hover);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 6px 25px rgba(0,0,0,0.25);
 }
-
-.edit-toggle-button {
-    background-color: #ffc107; /* Amarillo para habilitar edición */
-    color: #333; /* Texto oscuro para contraste */
+.edit-toggle-button:active,
+.download-button:active {
+  background: var(--button-active);
+  transform: scale(0.98);
 }
-
-.edit-toggle-button:hover {
-    background-color: #e0a800;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
-}
-
-/* Estilos para el input de edición de encabezados */
-.header-edit-input { /* Nueva clase para el input de edición de encabezados */
-    width: calc(100% - 10px); /* Ajusta el ancho */
-    padding: 3px 5px;
-    border: 1px solid #007bff;
-    border-radius: 4px;
-    font-size: inherit; /* Hereda el tamaño de fuente de la celda */
-    box-sizing: border-box; /* Importante para el padding */
-    outline: none; /* Elimina el contorno al enfocar */
-}
-
 
 .data-grid-container {
-    margin-top: 30px; /* Reduce margen */
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
-    background-color: #ffffff;
+  background: var(--card-bg);
+  padding: 25px;
+  border-radius: 15px;
+  box-shadow: 0 6px 25px rgba(0,0,0,0.1);
+  margin-bottom: 40px;
 }
 
-.data-grid-container h2 {
-    background-color: #edf2f7;
-    padding: 15px;
-    margin: 0;
-    border-bottom: 1px solid #e2e8f0;
-    color: #2d3748;
-    font-size: 1.5em;
-    font-weight: 600;
+.analysis-section {
+  text-align: center;
+  margin-bottom: 30px;
 }
 
-
-
-/* Estilos para react-data-grid */
-.rdg-root {
-    font-size: 13px;
-    border-radius: 8px;
-    overflow: hidden;
-    width: 100%;
-    height: auto;
-    max-height: 60vh; /* Altura máxima para la tabla, permite scroll vertical */
+.analysis-title {
+  font-family: 'Roboto Mono', monospace;
+  color: var(--secondary-color);
+  font-size: 2rem;
+  margin-bottom: 20px;
 }
 
-.rdg-header-row {
-    background-color: #e2e8f0;
-    font-weight: bold;
-    color: #4a5568;
-    border-bottom: 1px solid #cbd5e0;
+.results-section {
+  background: var(--card-bg);
+  padding: 30px;
+  border-radius: 15px;
+  box-shadow: 0 6px 25px rgba(0,0,0,0.1);
+  border: 1px solid #D5DBDB;
 }
 
-.rdg-row {
-    background-color: #fff;
-    border-bottom: 1px solid #ebf4ff;
+/* Cards de análisis */
+.analysis-card {
+  background: #FDFEFE;
+  padding: 25px;
+  border-radius: 15px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  border-left: 6px solid var(--primary-color);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.analysis-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+}
+.analysis-card p,
+.analysis-card ul {
+  margin: 8px 0;
+}
+.analysis-card strong {
+  color: var(--accent-color);
 }
 
-.rdg-row:nth-child(even) {
-    background-color: #f7fafc;
+/* Tabla de frecuencia profesional */
+.table-wrapper {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 400px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+  margin-top: 20px;
+  border: 1px solid #D5DBDB;
+  background: #FDFEFE;
 }
 
-.rdg-cell {
-    padding: 6px 10px;
-    border-right: 1px solid #edf2f7;
+.table-wrapper table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 800px;
 }
 
-.rdg-cell:last-child {
-    border-right: none;
+.table-wrapper thead th {
+  position: sticky;
+  top: 0;
+  background-color: var(--table-header-bg);
+  color: var(--table-header-text);
+  padding: 12px;
+  z-index: 2;
+  text-align: center;
+  border-bottom: 2px solid var(--table-border);
+  font-weight: 700;
 }
 
+.table-wrapper tbody td:first-child,
+.table-wrapper thead th:first-child {
+  position: sticky;
+  left: 0;
+  background-color: #34495E;
+  color: var(--text-color-light);
+  z-index: 3;
+  text-align: center;
+}
+
+.table-wrapper tbody tr:nth-child(even) {
+  background-color: #F2F4F4;
+}
+
+.table-wrapper tbody tr:hover td {
+  background-color: var(--table-row-hover);
+  transition: background 0.3s ease;
+}
+
+.table-wrapper tbody td {
+  padding: 12px;
+  text-align: center;
+  border-bottom: 1px solid #D5DBDB;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Mensaje sin datos */
 .no-data-message {
-    margin-top: 20px;
-    color: #777;
-    font-style: italic;
-    font-size: 1em;
-    padding: 15px;
-    background-color: #f0f4f8;
-    border-radius: 8px;
-    border: 1px solid #d2dae2;
+  text-align: center;
+  font-style: italic;
+  margin-top: 30px;
+  color: #566573;
 }
 
-/* Media Queries para pantallas más pequeñas (móviles) */
-@media (max-width: 768px) {
-    #root {
-        padding: 0.5rem;
-    }
-
-    .container {
-        padding: 15px;
-        margin: 5px;
-    }
-
-    h1 {
-        font-size: 1.8em;
-    }
-
-    .custom-file-upload {
-        padding: 8px 15px;
-        font-size: 0.9em;
-    }
-
-    .action-buttons-section {
-        flex-direction: column; /* Apila los botones en móviles */
-        gap: 10px;
-    }
-    .download-button, .edit-toggle-button {
-        width: 80%; /* Ocupa más ancho */
-        margin: 0 auto; /* Centra los botones apilados */
-    }
-
-    .data-grid-container h2 {
-        font-size: 1.3em;
-        padding: 12px;
-    }
-
-    .rdg-root {
-        font-size: 12px;
-        max-height: 50vh; /* Ajusta la altura máxima para móviles */
-    }
-
-    .rdg-cell {
-        padding: 5px 8px;
-    }
+/* Selector de variable futura para gráficos */
+.variable-select {
+  margin: 15px 0;
+  padding: 10px 15px;
+  border-radius: 10px;
+  border: 1px solid #D5DBDB;
+  font-size: 1rem;
+  background: #FDFEFE;
+  color: var(--text-color-dark);
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
+  transition: all 0.3s ease;
 }
-
-.editable-grid .rdg-cell {
-  cursor: text !important;
+.variable-select:hover {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 8px rgba(31, 38, 135, 0.2);
 }
