@@ -6,7 +6,7 @@ import {
   PieChart, Pie, Cell, Legend
 } from "recharts";
 
-// Utilidad para convertir valores a número
+// ------------------- Utilidades -------------------
 function toNumber(val) {
   if (val === null || val === undefined) return NaN;
   if (typeof val === "number") return val;
@@ -17,7 +17,6 @@ function toNumber(val) {
   return Number.isNaN(n) ? parseFloat(s) : n;
 }
 
-// Detecta columnas numéricas basadas en tasa de valores convertibles
 function getNumericColumnKeys(data, columns, sampleSize = 100, threshold = 0.6) {
   const keys = columns.map(c => c.key);
   const max = Math.min(sampleSize, data.length);
@@ -34,14 +33,6 @@ function getNumericColumnKeys(data, columns, sampleSize = 100, threshold = 0.6) 
   return numericKeys;
 }
 
-// Elige una columna categórica (no numérica) si existe
-function getCategoryKey(data, columns, numericKeys) {
-  const nonNumeric = columns.map(c => c.key).filter(k => !numericKeys.includes(k));
-  if (nonNumeric.length > 0) return nonNumeric[0];
-  return null;
-}
-
-// Agrega por categoría (suma)
 function aggregateByCategory(data, catKey, valKey) {
   const map = new Map();
   for (const row of data) {
@@ -53,11 +44,10 @@ function aggregateByCategory(data, catKey, valKey) {
     }
   }
   const arr = Array.from(map, ([name, value]) => ({ name, value }));
-  arr.sort((a,b) => b.value - a.value);
+  arr.sort((a, b) => b.value - a.value);
   return arr.slice(0, 12);
 }
 
-// Genera bins para histograma
 function histogram(data, valKey, bins = 8) {
   const values = data.map(r => toNumber(r?.[valKey])).filter(v => !Number.isNaN(v));
   if (values.length === 0) return [];
@@ -67,7 +57,7 @@ function histogram(data, valKey, bins = 8) {
   const width = (max - min) / bins;
   const result = Array.from({ length: bins }, (_, i) => ({
     from: min + i * width,
-    to: i === bins - 1 ? max : min + (i+1) * width,
+    to: i === bins - 1 ? max : min + (i + 1) * width,
     count: 0
   }));
   for (const v of values) {
@@ -86,6 +76,7 @@ const COLORS = [
   "#6b83b7","#73c2b0"
 ];
 
+// ------------------- Componente principal -------------------
 function Graficos({ data, columns, selectedColumn }) {
   const { barData, pieData, xLabel, yLabel, mode } = useMemo(() => {
     if (!data || !columns || data.length === 0 || columns.length === 0) {
@@ -95,23 +86,27 @@ function Graficos({ data, columns, selectedColumn }) {
     const numericKeys = getNumericColumnKeys(data, columns);
     const byKey = new Map(columns.map(c => [c.key, c.name || c.key]));
 
-    // Si se ha seleccionado columna y es numérica → usamos selectedColumn
-    let yKey = selectedColumn && numericKeys.includes(selectedColumn) ? selectedColumn : numericKeys[0] || null;
-    if (!yKey) {
-      // No hay columna numérica → contar por primera columna
-      const catKey = columns[0].key;
+    // Caso 1: Si el usuario selecciona una columna categórica → contamos
+    if (selectedColumn && !numericKeys.includes(selectedColumn)) {
       const countMap = new Map();
       for (const r of data) {
-        const cat = String(r?.[catKey] ?? "(vacío)");
+        const cat = String(r?.[selectedColumn] ?? "(vacío)");
         countMap.set(cat, (countMap.get(cat) || 0) + 1);
       }
       const arr = Array.from(countMap, ([name, value]) => ({ name, value }))
-        .sort((a,b)=>b.value-a.value)
+        .sort((a, b) => b.value - a.value)
         .slice(0, 12);
-      return { barData: arr, pieData: arr, xLabel: byKey.get(catKey), yLabel: "Conteo", mode: "count" };
+      return { barData: arr, pieData: arr, xLabel: byKey.get(selectedColumn), yLabel: "Conteo", mode: "count" };
     }
 
-    const catKey = getCategoryKey(data, columns, numericKeys);
+    // Caso 2: Si selecciona o existe columna numérica
+    let yKey = selectedColumn && numericKeys.includes(selectedColumn) ? selectedColumn : numericKeys[0] || null;
+    if (!yKey) {
+      return { barData: [], pieData: [], xLabel: "", yLabel: "", mode: "empty" };
+    }
+
+    // Buscar categórica para eje X
+    const catKey = columns.find(c => c.key !== yKey && !numericKeys.includes(c.key))?.key;
     if (catKey) {
       const agg = aggregateByCategory(data, catKey, yKey);
       return { barData: agg, pieData: agg, xLabel: byKey.get(catKey), yLabel: byKey.get(yKey), mode: "cat-sum" };
@@ -121,7 +116,7 @@ function Graficos({ data, columns, selectedColumn }) {
     }
   }, [data, columns, selectedColumn]);
 
-  if (!barData.length) return <p>No hay datos numéricos disponibles para la columna seleccionada.</p>;
+  if (!barData.length) return <p>No hay datos para graficar.</p>;
 
   return (
     <div className="graficos-container">
@@ -130,7 +125,7 @@ function Graficos({ data, columns, selectedColumn }) {
         <p className="subtitle">
           {mode === "cat-sum" && "Agregación por categoría (suma del valor)."}
           {mode === "hist" && "Distribución (histograma) de la columna numérica."}
-          {mode === "count" && "Conteo por categoría en la primera columna."}
+          {mode === "count" && "Conteo por categoría."}
         </p>
       </div>
 
@@ -165,7 +160,6 @@ function Graficos({ data, columns, selectedColumn }) {
                 outerRadius={110}
                 innerRadius={40}
                 animationDuration={700}
-                isAnimationActive
               >
                 {pieData.map((entry, index) => (
                   <Cell key={`slice-${index}`} fill={COLORS[index % COLORS.length]} />

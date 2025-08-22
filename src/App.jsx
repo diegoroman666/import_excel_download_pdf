@@ -4,8 +4,20 @@ import * as XLSX from 'xlsx';
 import { DataGrid, textEditor } from 'react-data-grid';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+
 import Menu3D from "./components/Menu3D";
-import Graficos from "./components/Graficos";
+import Menu3DGraficos from "./components/Menu3DGraficos";
+
+// Importamos los 9 tipos de gráficos
+import Barras from "./components/graficos/Barras";
+import Circular from "./components/graficos/Circular";
+import Histograma from "./components/graficos/Histograma";
+import Lineas from "./components/graficos/Lineas";
+import Dispersion from "./components/graficos/Dispersion";
+import Area from "./components/graficos/Area";
+import Radar from "./components/graficos/Radar";
+import Stacked from "./components/graficos/Stacked";
+import Mixto from "./components/graficos/Mixto";
 
 import { calculateMean, calculateMedian, calculateMode } from './data/MTC';
 import { calculatePercentile, calculateQuartiles, calculateDeciles } from './data/MTP';
@@ -26,12 +38,38 @@ const downloadExcel = (data, columns, fileName) => {
   XLSX.writeFile(workbook, `${fileName || 'edited_excel'}.xlsx`);
 };
 
+// Mapping de los gráficos
+const GRAPH_COMPONENTS = {
+  barras: Barras,
+  circular: Circular,
+  histograma: Histograma,
+  lineas: Lineas,
+  dispersion: Dispersion,
+  area: Area,
+  radar: Radar,
+  stacked: Stacked,
+  mixto: Mixto
+};
+
 function App() {
   const [excelData, setExcelData] = useState([]);
   const [fileName, setFileName] = useState('');
   const [columns, setColumns] = useState([]);
   const [activeView, setActiveView] = useState('graficos');
   const [selectedColumn, setSelectedColumn] = useState('');
+  const [selectedGraph, setSelectedGraph] = useState('barras');
+
+  const graphOptions = [
+    { key: "barras", label: "Gráfico de Barras" },
+    { key: "circular", label: "Gráfico Circular" },
+    { key: "histograma", label: "Histograma" },
+    { key: "lineas", label: "Gráfico de Líneas" },
+    { key: "dispersion", label: "Gráfico de Dispersión" },
+    { key: "area", label: "Gráfico de Área" },
+    { key: "radar", label: "Gráfico Radar" },
+    { key: "stacked", label: "Barras Apiladas" },
+    { key: "mixto", label: "Gráfico Mixto" },
+  ];
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
@@ -107,6 +145,7 @@ function App() {
     doc.save(`${fileName}_tabla.pdf`);
   };
 
+  // Datos numéricos en base a la columna seleccionada
   const numericData = useMemo(() => {
     if (!excelData.length || !columns.length || !selectedColumn) return [];
     return excelData
@@ -147,70 +186,146 @@ function App() {
     };
   }, [excelData, columns, selectedColumn]);
 
+  const GraphComponent = GRAPH_COMPONENTS[selectedGraph];
+
   const renderAnalysisContent = () => {
     if (!excelData.length || !selectedColumn) return null;
 
     switch (activeView) {
       case 'graficos':
-        return <Graficos data={excelData} columns={columns} selectedColumn={selectedColumn} />;
+        return (
+          <div className="graficos-section">
+            {/* Menu 3D específico de gráficos */}
+            <Menu3DGraficos
+              selectedGraph={selectedGraph}
+              setSelectedGraph={setSelectedGraph}
+              graphOptions={graphOptions}
+            />
+
+            {/* Selector de columna dentro de la sección de gráficos */}
+            <div className="menu-graficos-column">
+              <label htmlFor="column-select-graficos">Seleccionar Columna:</label>
+              <select
+                id="column-select-graficos"
+                value={selectedColumn}
+                onChange={(e) => setSelectedColumn(e.target.value)}
+              >
+                {columns.map(col => <option key={col.key} value={col.key}>{col.name}</option>)}
+              </select>
+            </div>
+
+            {/* Render dinámico del gráfico seleccionado */}
+            {GraphComponent ? (
+              <GraphComponent
+                data={excelData}
+                columns={columns}
+                selectedColumn={selectedColumn}
+              />
+            ) : <p>No se pudo cargar el gráfico.</p>}
+          </div>
+        );
 
       case 'tendencia':
         return (
           <div className="analysis-container">
+            <div className="menu-graficos-column">
+              <label htmlFor="column-select-tendencia">Seleccionar Columna:</label>
+              <select
+                id="column-select-tendencia"
+                value={selectedColumn}
+                onChange={(e) => setSelectedColumn(e.target.value)}
+              >
+                {columns.map(col => <option key={col.key} value={col.key}>{col.name}</option>)}
+              </select>
+            </div>
+
             <h3>Medidas de Tendencia Central</h3>
             {mtcResults ? (
               <div className="analysis-card">
-                <p><strong>Media:</strong> {mtcResults.mean?.toFixed(2)}</p>
-                <p><strong>Mediana:</strong> {mtcResults.median?.toFixed(2)}</p>
-                <p><strong>Moda:</strong> {mtcResults.mode?.map(m => m.toFixed(2)).join(', ')}</p>
+                <p><strong>Media:</strong> {mtcResults.mean?.toFixed(4)}</p>
+                <p><strong>Mediana:</strong> {mtcResults.median?.toFixed(4)}</p>
+                <p><strong>Moda:</strong> {mtcResults.mode?.map(m => Number(m).toFixed(4)).join(', ')}</p>
               </div>
-            ) : <p>No hay datos numéricos.</p>}
+            ) : <p>No hay datos numéricos en la columna seleccionada.</p>}
           </div>
         );
 
       case 'posicion':
         return (
           <div className="analysis-container">
+            <div className="menu-graficos-column">
+              <label htmlFor="column-select-posicion">Seleccionar Columna:</label>
+              <select
+                id="column-select-posicion"
+                value={selectedColumn}
+                onChange={(e) => setSelectedColumn(e.target.value)}
+              >
+                {columns.map(col => <option key={col.key} value={col.key}>{col.name}</option>)}
+              </select>
+            </div>
+
             <h3>Medidas de Posición</h3>
             {mtpResults ? (
               <>
                 <div className="analysis-card">
                   <h4>Cuartiles</h4>
-                  <p><strong>Q1 (P25):</strong> {mtpResults.quartiles.q1.toFixed(2)}</p>
-                  <p><strong>Q2 (P50):</strong> {mtpResults.quartiles.q2.toFixed(2)}</p>
-                  <p><strong>Q3 (P75):</strong> {mtpResults.quartiles.q3.toFixed(2)}</p>
+                  <p><strong>Q1 (P25):</strong> {mtpResults.quartiles.q1.toFixed(4)}</p>
+                  <p><strong>Q2 (P50):</strong> {mtpResults.quartiles.q2.toFixed(4)}</p>
+                  <p><strong>Q3 (P75):</strong> {mtpResults.quartiles.q3.toFixed(4)}</p>
                 </div>
                 <div className="analysis-card">
                   <h4>Deciles</h4>
                   <ul>
                     {Object.keys(mtpResults.deciles).map(key => (
-                      <li key={key}><strong>{key.toUpperCase()}:</strong> {mtpResults.deciles[key].toFixed(2)}</li>
+                      <li key={key}><strong>{key.toUpperCase()}:</strong> {mtpResults.deciles[key].toFixed(4)}</li>
                     ))}
                   </ul>
                 </div>
               </>
-            ) : <p>No hay datos numéricos.</p>}
+            ) : <p>No hay datos numéricos en la columna seleccionada.</p>}
           </div>
         );
 
       case 'dispersion':
         return (
           <div className="analysis-container">
+            <div className="menu-graficos-column">
+              <label htmlFor="column-select-dispersion">Seleccionar Columna:</label>
+              <select
+                id="column-select-dispersion"
+                value={selectedColumn}
+                onChange={(e) => setSelectedColumn(e.target.value)}
+              >
+                {columns.map(col => <option key={col.key} value={col.key}>{col.name}</option>)}
+              </select>
+            </div>
+
             <h3>Medidas de Dispersión</h3>
             {disperResults ? (
               <div className="analysis-card">
-                <p><strong>Rango:</strong> {disperResults.range?.toFixed(2)}</p>
-                <p><strong>Varianza:</strong> {disperResults.variance?.toFixed(2)}</p>
-                <p><strong>Desviación Estándar:</strong> {disperResults.standardDeviation?.toFixed(2)}</p>
-                <p><strong>Coeficiente de Variación:</strong> {disperResults.coefficientOfVariation?.toFixed(2)}</p>
+                <p><strong>Rango:</strong> {disperResults.range?.toFixed(4)}</p>
+                <p><strong>Varianza:</strong> {disperResults.variance?.toFixed(4)}</p>
+                <p><strong>Desviación Estándar:</strong> {disperResults.standardDeviation?.toFixed(4)}</p>
+                <p><strong>Coeficiente de Variación:</strong> {disperResults.coefficientOfVariation?.toFixed(4)}</p>
               </div>
-            ) : <p>No hay datos numéricos.</p>}
+            ) : <p>No hay datos numéricos en la columna seleccionada.</p>}
           </div>
         );
 
       case 'frecuencia':
         return (
           <div className="analysis-container">
+            <div className="menu-graficos-column">
+              <label htmlFor="column-select-frecuencia">Seleccionar Columna:</label>
+              <select
+                id="column-select-frecuencia"
+                value={selectedColumn}
+                onChange={(e) => setSelectedColumn(e.target.value)}
+              >
+                {columns.map(col => <option key={col.key} value={col.key}>{col.name}</option>)}
+              </select>
+            </div>
+
             <h3>Tablas de Frecuencia</h3>
             {frecuenciaResults ? (
               <>
@@ -286,7 +401,7 @@ function App() {
     <div className="container">
       <h1>Importador y Analizador Científico de Excel</h1>
 
-      {/* BOTÓN ÚNICO PARA SUBIR ARCHIVO */}
+      {/* Carga de archivo */}
       <div className="upload-section">
         <label htmlFor="file-upload" className="custom-file-upload">Seleccionar Archivo Excel</label>
         <input
@@ -299,21 +414,7 @@ function App() {
         {fileName && <p className="file-name">Archivo seleccionado: <strong>{fileName}.xlsx</strong></p>}
       </div>
 
-      {/* SELECTOR DE COLUMNA */}
-      {columns.length > 0 && (
-        <div className="column-selector">
-          <label htmlFor="column-select">Seleccionar Columna para Análisis/Grafico:</label>
-          <select
-            id="column-select"
-            value={selectedColumn}
-            onChange={(e) => setSelectedColumn(e.target.value)}
-          >
-            {columns.map(col => <option key={col.key} value={col.key}>{col.name}</option>)}
-          </select>
-        </div>
-      )}
-
-      {/* BOTONES DE DESCARGA */}
+      {/* Botones de descarga */}
       {excelData.length && columns.length && (
         <div className="action-buttons-section">
           <button onClick={handleDownloadPDF} className="edit-toggle-button">Descargar PDF</button>
@@ -321,7 +422,7 @@ function App() {
         </div>
       )}
 
-      {/* DATA GRID */}
+      {/* DataGrid */}
       {excelData.length && columns.length && (
         <div className="data-grid-container">
           <h2>Datos del Archivo Excel</h2>
@@ -335,7 +436,7 @@ function App() {
         </div>
       )}
 
-      {/* SECCIÓN DE ANÁLISIS */}
+      {/* Panel de análisis + menú de vistas */}
       {excelData.length && columns.length && (
         <>
           <div className="analysis-section">

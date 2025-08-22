@@ -1,0 +1,81 @@
+/* Contenedor y tarjetas */
+.graficos-container {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.chart-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background-color: #ffffff;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+  padding: 12px 12px 8px;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.chart-card:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(0,0,0,0.12); }
+
+.chart-card h4 {
+  margin: 0 0 8px;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+/* Grid adaptable */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+@media (min-width: 900px) {
+  .charts-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* Notas de ejes */
+.axis-notes {
+  display: flex;
+  justify-content: space-between;
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin-top: 6px;
+}
+
+/* Menu 3D sutil */
+.menu3d-wrap {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 8px 0 14px;
+}
+.menu3d-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: linear-gradient(180deg,#ffffff,#f9fafb);
+  padding: 10px 12px;
+  cursor: pointer;
+  transform: perspective(600px) translateZ(0);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.06);
+  text-align: center;
+}
+.menu3d-card:hover {
+  transform: perspective(600px) translateZ(6px);
+  box-shadow: 0 10px 22px rgba(0,0,0,0.10);
+}
+.menu3d-card.active {
+  border-color: #60a5fa;
+  box-shadow: 0 12px 24px rgba(96,165,250,0.25);
+}
+.menu3d-title {
+  font-size: .95rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+/* Selector de columna usado en App */
+.menu-graficos-column {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 12px;
+}
+.menu-graficos-column label { font-weight: 500; }

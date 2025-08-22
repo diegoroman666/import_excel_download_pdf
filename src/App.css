@@ -1,245 +1,96 @@
-@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Roboto:wght@400;700&display=swap');
-
-:root {
-  --primary-color: #1F618D; /* Azul profundo */
-  --secondary-color: #117A65; /* Verde serio */
-  --accent-color: #F39C12; /* Amarillo para resaltar */
-  --bg-color: #F4F6F6; /* Gris muy claro */
-  --card-bg: rgba(255, 255, 255, 0.95);
-  --text-color-dark: #212F3C;
-  --text-color-light: #FDFEFE;
-  --table-header-bg: #1C2833;
-  --table-header-text: #FDFEFE;
-  --table-row-bg: #FBFCFC;
-  --table-row-hover: #D6EAF8;
-  --table-border: #ABB2B9;
-  --button-bg: linear-gradient(135deg, #1F618D, #117A65);
-  --button-hover: linear-gradient(135deg, #117A65, #1F618D);
-  --button-active: #117A65;
-  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-}
-
-body {
-  font-family: 'Roboto', sans-serif;
-  background-color: var(--bg-color);
-  color: var(--text-color-dark);
-  margin: 0;
-  padding: 0;
-}
-
 .container {
-  width: 95%;
-  max-width: 1400px;
-  margin: 40px auto;
-  padding: 30px;
-  background: var(--card-bg);
-  border-radius: 20px;
-  box-shadow: var(--glass-shadow);
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
 }
 
 h1 {
   text-align: center;
-  font-family: 'Roboto Mono', monospace;
-  color: var(--primary-color);
-  font-size: 2.5rem;
-  margin-bottom: 40px;
-  text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+  margin-bottom: 24px;
+  color: #2c3e50;
 }
 
 .upload-section {
-  text-align: center;
-  margin-bottom: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 20px;
 }
 
 .custom-file-upload {
+  background-color: #3498db;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
   cursor: pointer;
-  background: var(--button-bg);
-  color: var(--text-color-light);
-  padding: 18px 40px;
-  border-radius: 40px;
-  font-weight: 700;
-  font-size: 1rem;
-  transition: all 0.4s;
-  display: inline-block;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-}
-.custom-file-upload:hover {
-  background: var(--button-hover);
-  transform: translateY(-3px) scale(1.03);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
 }
 
 .file-name {
-  margin-top: 10px;
-  font-style: italic;
-  color: #566573;
-}
-.file-name strong {
-  color: var(--accent-color);
-  font-weight: 700;
+  margin-top: 8px;
+  font-size: 0.95rem;
 }
 
 .action-buttons-section {
   display: flex;
-  gap: 20px;
   justify-content: center;
-  margin-bottom: 30px;
+  gap: 16px;
+  margin-bottom: 20px;
 }
 
-.edit-toggle-button,
-.download-button {
-  padding: 15px 30px;
+.edit-toggle-button, .download-button {
+  padding: 8px 16px;
   border: none;
-  border-radius: 30px;
+  border-radius: 6px;
   cursor: pointer;
-  font-weight: 700;
-  color: var(--text-color-light);
-  font-size: 1rem;
-  background: var(--button-bg);
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  background-color: #2ecc71;
+  color: white;
+  font-weight: 500;
 }
-.edit-toggle-button:hover,
-.download-button:hover {
-  background: var(--button-hover);
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 6px 25px rgba(0,0,0,0.25);
-}
-.edit-toggle-button:active,
-.download-button:active {
-  background: var(--button-active);
-  transform: scale(0.98);
+
+.edit-toggle-button:hover, .download-button:hover {
+  opacity: 0.85;
 }
 
 .data-grid-container {
-  background: var(--card-bg);
-  padding: 25px;
-  border-radius: 15px;
-  box-shadow: 0 6px 25px rgba(0,0,0,0.1);
-  margin-bottom: 40px;
+  margin-bottom: 24px;
 }
 
 .analysis-section {
-  text-align: center;
-  margin-bottom: 30px;
+  margin-top: 24px;
+  margin-bottom: 12px;
 }
 
 .analysis-title {
-  font-family: 'Roboto Mono', monospace;
-  color: var(--secondary-color);
-  font-size: 2rem;
-  margin-bottom: 20px;
+  text-align: center;
+  margin-bottom: 12px;
 }
 
 .results-section {
-  background: var(--card-bg);
-  padding: 30px;
-  border-radius: 15px;
-  box-shadow: 0 6px 25px rgba(0,0,0,0.1);
-  border: 1px solid #D5DBDB;
+  margin-bottom: 40px;
 }
 
-/* Cards de análisis */
-.analysis-card {
-  background: #FDFEFE;
-  padding: 25px;
-  border-radius: 15px;
-  margin-bottom: 20px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-  border-left: 6px solid var(--primary-color);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-.analysis-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 25px rgba(0,0,0,0.2);
-}
-.analysis-card p,
-.analysis-card ul {
-  margin: 8px 0;
-}
-.analysis-card strong {
-  color: var(--accent-color);
-}
-
-/* Tabla de frecuencia profesional */
-.table-wrapper {
-  overflow-x: auto;
-  overflow-y: auto;
-  max-height: 400px;
-  border-radius: 12px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-  margin-top: 20px;
-  border: 1px solid #D5DBDB;
-  background: #FDFEFE;
-}
-
-.table-wrapper table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 800px;
-}
-
-.table-wrapper thead th {
-  position: sticky;
-  top: 0;
-  background-color: var(--table-header-bg);
-  color: var(--table-header-text);
-  padding: 12px;
-  z-index: 2;
-  text-align: center;
-  border-bottom: 2px solid var(--table-border);
-  font-weight: 700;
-}
-
-.table-wrapper tbody td:first-child,
-.table-wrapper thead th:first-child {
-  position: sticky;
-  left: 0;
-  background-color: #34495E;
-  color: var(--text-color-light);
-  z-index: 3;
-  text-align: center;
-}
-
-.table-wrapper tbody tr:nth-child(even) {
-  background-color: #F2F4F4;
-}
-
-.table-wrapper tbody tr:hover td {
-  background-color: var(--table-row-hover);
-  transition: background 0.3s ease;
-}
-
-.table-wrapper tbody td {
-  padding: 12px;
-  text-align: center;
-  border-bottom: 1px solid #D5DBDB;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Mensaje sin datos */
 .no-data-message {
   text-align: center;
-  font-style: italic;
-  margin-top: 30px;
-  color: #566573;
+  color: #e74c3c;
+  font-weight: 500;
 }
 
-/* Selector de variable futura para gráficos */
-.variable-select {
-  margin: 15px 0;
-  padding: 10px 15px;
-  border-radius: 10px;
-  border: 1px solid #D5DBDB;
-  font-size: 1rem;
-  background: #FDFEFE;
-  color: var(--text-color-dark);
-  box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
-  transition: all 0.3s ease;
+/* Nuevo selector de columna dentro de gráficos */
+.menu-graficos-column {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
 }
-.variable-select:hover {
-  border-color: var(--primary-color);
-  box-shadow: 0 0 8px rgba(31, 38, 135, 0.2);
+
+.menu-graficos-column label {
+  font-weight: 500;
+}
+
+/* Selector tipo de gráfico en la sección de gráficos */
+.menu-graficos {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
 }
