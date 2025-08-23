@@ -1,4 +1,3 @@
-// src/App.jsx
 import React, { useState, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { DataGrid, textEditor } from 'react-data-grid';
@@ -8,17 +7,21 @@ import autoTable from 'jspdf-autotable';
 import Menu3D from "./components/Menu3D";
 import Menu3DGraficos from "./components/Menu3DGraficos";
 
-// Importamos los 9 tipos de gráficos
-import Barras from "./components/graficos/Barras";
-import Circular from "./components/graficos/Circular";
-import Histograma from "./components/graficos/Histograma";
-import Lineas from "./components/graficos/Lineas";
-import Dispersion from "./components/graficos/Dispersion";
-import Area from "./components/graficos/Area";
-import Radar from "./components/graficos/Radar";
-import Stacked from "./components/graficos/Stacked";
-import Mixto from "./components/graficos/Mixto";
+// === Gráficos (todos en Plotly) ===
+import Barras from "./components/graficos/BarrasPlotly";
+import Circular from "./components/graficos/CircularPlotly";
+import Histograma from "./components/graficos/HistogramaPlotly";
+import Lineas from "./components/graficos/LineasPlotly";
+import Dispersion from "./components/graficos/DispersionPlotly";
+import Area from "./components/graficos/AreaPlotly";
+import Radar from "./components/graficos/RadarPlotly";
+import Stacked from "./components/graficos/StackedPlotly";
+import Mixto from "./components/graficos/MixtoPlotly";
+import Cajas from "./components/graficos/CajasPlotly";
+import Heatmap from "./components/graficos/HeatmapPlotly";
+import Regresion from "./components/graficos/RegresionPlotly";
 
+// === Cálculos estadísticos existentes ===
 import { calculateMean, calculateMedian, calculateMode } from './data/MTC';
 import { calculatePercentile, calculateQuartiles, calculateDeciles } from './data/MTP';
 import { calculateRange, calculateVariance, calculateStandardDeviation, calculateCoefficientOfVariation } from './data/Disper';
@@ -28,6 +31,9 @@ import 'react-data-grid/lib/styles.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
+// =============================
+// Utilidad: descargar Excel
+// =============================
 const downloadExcel = (data, columns, fileName) => {
   const workbook = XLSX.utils.book_new();
   const headers = columns.map(col => col.name);
@@ -38,7 +44,9 @@ const downloadExcel = (data, columns, fileName) => {
   XLSX.writeFile(workbook, `${fileName || 'edited_excel'}.xlsx`);
 };
 
-// Mapping de los gráficos
+// =============================
+// Mapeo de gráficos
+// =============================
 const GRAPH_COMPONENTS = {
   barras: Barras,
   circular: Circular,
@@ -48,17 +56,29 @@ const GRAPH_COMPONENTS = {
   area: Area,
   radar: Radar,
   stacked: Stacked,
-  mixto: Mixto
+  mixto: Mixto,
+  cajas: Cajas,
+  heatmap: Heatmap,
+  regresion: Regresion
 };
 
 function App() {
+  // === Estado base ===
   const [excelData, setExcelData] = useState([]);
   const [fileName, setFileName] = useState('');
-  const [columns, setColumns] = useState([]);
+  const [columns, setColumns] = useState([]); // [{ key: col0, name: "Header" }, ...]
   const [activeView, setActiveView] = useState('graficos');
-  const [selectedColumn, setSelectedColumn] = useState('');
-  const [selectedGraph, setSelectedGraph] = useState('barras');
 
+  // === Estado de selección de gráfico y variables ===
+  const [selectedGraph, setSelectedGraph] = useState('barras');
+  const [xKey, setXKey] = useState(''); // nombre de columna (header)
+  const [yKey, setYKey] = useState(''); // nombre de columna (header)
+  const [useY, setUseY] = useState(true); // botón "Variable Y"
+
+  // === Para vistas estadísticas existentes (una sola columna) ===
+  const [selectedColumn, setSelectedColumn] = useState('');
+
+  // Opciones del menú de gráficos
   const graphOptions = [
     { key: "barras", label: "Gráfico de Barras" },
     { key: "circular", label: "Gráfico Circular" },
@@ -69,8 +89,14 @@ function App() {
     { key: "radar", label: "Gráfico Radar" },
     { key: "stacked", label: "Barras Apiladas" },
     { key: "mixto", label: "Gráfico Mixto" },
+    { key: "cajas", label: "Diagrama de Cajas" },
+    { key: "heatmap", label: "Mapa de Calor" },
+    { key: "regresion", label: "Gráfico de Regresión" },
   ];
 
+  // =============================
+  // Carga de archivo Excel
+  // =============================
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -106,13 +132,22 @@ function App() {
 
         setColumns(gridColumns);
         setExcelData(gridRows);
+
+        // Selecciones iniciales
+        const firstName = gridColumns[0]?.name || '';
+        const secondName = gridColumns[1]?.name || '';
+        setXKey(firstName);
+        setYKey(secondName || '');
         setSelectedColumn(gridColumns[0]?.key || '');
+        setUseY(Boolean(secondName)); // activa Y si hay al menos dos columnas
         setActiveView('graficos');
       } else {
         setColumns([]);
         setExcelData([]);
         setFileName('');
         setSelectedColumn('');
+        setXKey('');
+        setYKey('');
       }
     };
     reader.readAsArrayBuffer(file);
@@ -120,6 +155,9 @@ function App() {
 
   const onRowsChange = useCallback((updatedRows) => setExcelData(updatedRows), []);
 
+  // =============================
+  // Descargas
+  // =============================
   const handleDownloadEditedExcel = () => {
     if (excelData.length && columns.length) downloadExcel(excelData, columns, fileName);
   };
@@ -145,7 +183,31 @@ function App() {
     doc.save(`${fileName}_tabla.pdf`);
   };
 
-  // Datos numéricos en base a la columna seleccionada
+  // =============================
+  // Dataset para Gráficos (por NOMBRE de columna, no por key col0/col1)
+  // Convierte a número donde se pueda.
+  // =============================
+  const columnsByName = useMemo(
+    () => columns.map(c => ({ name: c.name })),
+    [columns]
+  );
+
+  const dataForCharts = useMemo(() => {
+    if (!excelData.length || !columns.length) return [];
+    return excelData.map(row => {
+      const obj = {};
+      for (const col of columns) {
+        const raw = row[col.key];
+        const num = parseFloat(raw);
+        obj[col.name] = !isNaN(num) && raw !== '' && raw !== null ? num : raw;
+      }
+      return obj;
+    });
+  }, [excelData, columns]);
+
+  // =============================
+  // Métricas por columna (vistas estadísticas existentes)
+  // =============================
   const numericData = useMemo(() => {
     if (!excelData.length || !columns.length || !selectedColumn) return [];
     return excelData
@@ -186,44 +248,93 @@ function App() {
     };
   }, [excelData, columns, selectedColumn]);
 
+  // =============================
+  // Render de sección de gráficos
+  // =============================
   const GraphComponent = GRAPH_COMPONENTS[selectedGraph];
 
+  const renderGraficos = () => {
+    if (!excelData.length || !columns.length) return null;
+
+    // controles de selección X/Y y botón Variable Y
+    const allNames = columnsByName.map(c => c.name);
+
+    const handleXChange = (e) => setXKey(e.target.value);
+    const handleYChange = (e) => setYKey(e.target.value);
+    const toggleY = () => {
+      // botón "Variable Y"
+      if (useY) {
+        setUseY(false);
+        setYKey('');
+      } else {
+        setUseY(true);
+        // si estaba vacío, intenta sugerir la segunda columna
+        if (!yKey) {
+          const suggest = allNames.find(n => n !== xKey);
+          setYKey(suggest || '');
+        }
+      }
+    };
+
+    return (
+      <div className="graficos-section">
+        {/* Menú 3D de gráficos */}
+        <Menu3DGraficos
+          selectedGraph={selectedGraph}
+          setSelectedGraph={setSelectedGraph}
+          graphOptions={graphOptions}
+        />
+
+        {/* Selector de variables */}
+        <div className="menu-graficos-column" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 12, alignItems: 'end', marginBottom: 16 }}>
+          <div>
+            <label htmlFor="x-select"><strong>Eje X</strong></label>
+            <select id="x-select" value={xKey} onChange={handleXChange}>
+              {allNames.map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="y-select"><strong>Variable Y (opcional)</strong></label>
+            <select id="y-select" value={yKey} onChange={handleYChange} disabled={!useY}>
+              <option value="">(ninguna)</option>
+              {allNames
+                .filter(n => n !== xKey)
+                .map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <button onClick={toggleY} className="edit-toggle-button" style={{ marginTop: 22 }}>
+              {useY ? "Desactivar Variable Y" : "Activar Variable Y"}
+            </button>
+          </div>
+        </div>
+
+        {/* Render del gráfico seleccionado */}
+        <div className="bg-white p-3 rounded-2xl shadow">
+          {GraphComponent ? (
+            <GraphComponent
+              data={dataForCharts}          // Datos por NOMBRE
+              columns={columnsByName}       // [{ name }]
+              xKey={xKey}                   // nombre de columna para X
+              yKey={useY ? yKey : ""}       // nombre de columna para Y (opcional)
+            />
+          ) : <p>No se pudo cargar el gráfico.</p>}
+        </div>
+      </div>
+    );
+  };
+
+  // =============================
+  // Render de vistas estadísticas
+  // =============================
   const renderAnalysisContent = () => {
-    if (!excelData.length || !selectedColumn) return null;
+    if (!excelData.length) return null;
 
     switch (activeView) {
       case 'graficos':
-        return (
-          <div className="graficos-section">
-            {/* Menu 3D específico de gráficos */}
-            <Menu3DGraficos
-              selectedGraph={selectedGraph}
-              setSelectedGraph={setSelectedGraph}
-              graphOptions={graphOptions}
-            />
-
-            {/* Selector de columna dentro de la sección de gráficos */}
-            <div className="menu-graficos-column">
-              <label htmlFor="column-select-graficos">Seleccionar Columna:</label>
-              <select
-                id="column-select-graficos"
-                value={selectedColumn}
-                onChange={(e) => setSelectedColumn(e.target.value)}
-              >
-                {columns.map(col => <option key={col.key} value={col.key}>{col.name}</option>)}
-              </select>
-            </div>
-
-            {/* Render dinámico del gráfico seleccionado */}
-            {GraphComponent ? (
-              <GraphComponent
-                data={excelData}
-                columns={columns}
-                selectedColumn={selectedColumn}
-              />
-            ) : <p>No se pudo cargar el gráfico.</p>}
-          </div>
-        );
+        return renderGraficos();
 
       case 'tendencia':
         return (
@@ -397,6 +508,9 @@ function App() {
     }
   };
 
+  // =============================
+  // Render principal
+  // =============================
   return (
     <div className="container">
       <h1>Importador y Analizador Científico de Excel</h1>
@@ -415,15 +529,15 @@ function App() {
       </div>
 
       {/* Botones de descarga */}
-      {excelData.length && columns.length && (
+      {excelData.length && columns.length ? (
         <div className="action-buttons-section">
           <button onClick={handleDownloadPDF} className="edit-toggle-button">Descargar PDF</button>
           <button onClick={handleDownloadEditedExcel} className="download-button">Descargar Excel</button>
         </div>
-      )}
+      ) : null}
 
       {/* DataGrid */}
-      {excelData.length && columns.length && (
+      {excelData.length && columns.length ? (
         <div className="data-grid-container">
           <h2>Datos del Archivo Excel</h2>
           <DataGrid
@@ -434,10 +548,10 @@ function App() {
             minHeight={400}
           />
         </div>
-      )}
+      ) : null}
 
       {/* Panel de análisis + menú de vistas */}
-      {excelData.length && columns.length && (
+      {excelData.length && columns.length ? (
         <>
           <div className="analysis-section">
             <h2 className="analysis-title">📊 Panel de Análisis</h2>
@@ -445,7 +559,7 @@ function App() {
           </div>
           <div className="results-section">{renderAnalysisContent()}</div>
         </>
-      )}
+      ) : null}
 
       {excelData.length === 0 && fileName && (
         <p className="no-data-message">No se encontraron datos en el archivo.</p>
