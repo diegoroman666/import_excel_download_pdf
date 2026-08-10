@@ -7,7 +7,8 @@ import useSeccionActiva from '../scroll3d/useSeccionActiva';
 import Icono from '../ui/Icono';
 
 export default function Navegacion({ hayDatos, onReiniciar }) {
-  const secciones = hayDatos ? SECCIONES : SECCIONES.slice(0, 2);
+  // Sin datos cargados sólo tienen sentido la portada, la carga y el historial.
+  const secciones = hayDatos ? SECCIONES : SECCIONES.slice(0, 3);
   const activa = useSeccionActiva(
     secciones.map((seccion) => seccion.id),
     { activo: true },

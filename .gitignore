@@ -38,8 +38,9 @@ ENV/
 *.local
 
 # --- Pruebas de extremo a extremo ----------------------------------------
-tests/e2e/capturas/
-tests/e2e/resultados/
+# Los patrones llevan **/ porque las pruebas viven en frontend/, no en la raíz.
+**/tests/e2e/capturas/
+**/tests/e2e/resultados/
 playwright-report/
 test-results/
 

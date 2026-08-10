@@ -38,6 +38,14 @@ class Settings:
     # Filas que se envían al navegador para el modo reactivo en cliente.
     preview_rows: int = _env_int("PREVIEW_ROWS", 5_000)
 
+    # Persistencia del historial. Si `database_url` está vacío, la aplicación
+    # funciona con normalidad pero sin guardar nada.
+    database_url: str = os.getenv("DATABASE_URL", "")
+    # Tamaño máximo de un archivo que se guarda en el historial.
+    max_bytes_historial: int = _env_int("MAX_BYTES_HISTORIAL", 8 * 1024 * 1024)
+    # Entradas conservadas por cliente; al superarlas se descartan las antiguas.
+    max_historial_por_cliente: int = _env_int("MAX_HISTORIAL", 25)
+
     # Ciclo de vida de los datasets en memoria
     dataset_ttl_seconds: int = _env_int("DATASET_TTL_SECONDS", 60 * 60)  # 1 h
     max_datasets: int = _env_int("MAX_DATASETS", 24)

@@ -21,6 +21,7 @@ análisis es un servicio **Python / FastAPI** que trabaja sobre **Pandas**.
 │   │   │   ├── dtypes.py        Compatibilidad de dtypes entre Pandas 2 y 3
 │   │   │   └── errors.py        Errores de dominio → respuestas HTTP
 │   │   ├── models/schemas.py    Contratos Pydantic compartidos con la UI
+│   │   ├── db/base.py           Conexión y tablas (persistencia opcional)
 │   │   ├── services/
 │   │   │   ├── ingestion.py     Lectura, limpieza e inferencia de tipos
 │   │   │   ├── classification.py Clasificación de variables (los 4 tipos)
@@ -29,9 +30,10 @@ análisis es un servicio **Python / FastAPI** que trabaja sobre **Pandas**.
 │   │   │   ├── samples.py       Generación de los 10 archivos de muestra
 │   │   │   ├── scraping.py      Validación por scraping simulado
 │   │   │   ├── export.py        Exportación a Excel y CSV
+│   │   │   ├── history.py       Historial persistido (opcional)
 │   │   │   └── store.py         Caché en memoria de datasets con TTL
 │   │   └── api/routes/          Endpoints HTTP
-│   ├── tests/                   104 pruebas (pytest)
+│   ├── tests/                   122 pruebas (pytest)
 │   └── requirements.txt
 │
 └── frontend/                    Interfaz (Next.js App Router + Tailwind v4)
@@ -51,12 +53,13 @@ análisis es un servicio **Python / FastAPI** que trabaja sobre **Pandas**.
     │   ├── stats/               Tendencia, posición, dispersión y frecuencias
     │   ├── table/               Vista tabular paginada
     │   ├── downloads/           Muestras y exportaciones
+    │   ├── history/             Historial de análisis guardados
     │   ├── quality/             Informe de validación de consistencia
     │   └── ui/                  Primitivas (botón, tarjeta, aviso, iconos…)
     ├── lib/                     Cliente de API, filtros, agregaciones, formato
     └── tests/
         ├── unit/                81 pruebas (node:test)
-        └── e2e/                 21 comprobaciones de usabilidad (Playwright)
+        └── e2e/                 24 comprobaciones de usabilidad (Playwright)
 ```
 
 ---
@@ -157,6 +160,15 @@ imposibles, identificadores duplicados, exceso de vacíos y variantes de
 escritura de una misma categoría. **No realiza peticiones de red**: es
 determinista y funciona sin conexión.
 
+### Historial (opcional)
+
+Con una base de datos PostgreSQL configurada en `DATABASE_URL`, los archivos
+analizados quedan guardados para reabrirlos o borrarlos. Se conserva el archivo
+original comprimido y se reprocesa al abrirlo, de modo que el resultado siempre
+corresponde a la versión actual del motor. Cada navegador ve sólo su propio
+historial mediante un identificador anónimo. Sin base de datos la aplicación
+funciona igual, sin esa sección.
+
 ### Descargas
 
 - **5 datasets de muestra en Excel** y **los mismos 5 en CSV**, generados con
@@ -178,13 +190,13 @@ la pestaña deja de estar visible.
 ## Pruebas
 
 ```bash
-# Motor de datos — 104 pruebas
+# Motor de datos — 122 pruebas
 cd backend && python -m pytest
 
 # Lógica de la interfaz — 81 pruebas
 cd frontend && npm test
 
-# Usabilidad de extremo a extremo — 21 comprobaciones
+# Usabilidad de extremo a extremo — 24 comprobaciones
 # (requiere el backend y el frontend en marcha)
 cd frontend && node tests/e2e/usabilidad.mjs
 ```

@@ -11,6 +11,7 @@
 import { useCallback, useRef } from 'react';
 import useDataset from '@/lib/useDataset';
 import PanelClasificacion from '@/components/classification/PanelClasificacion';
+import PanelHistorial from '@/components/history/PanelHistorial';
 import Dashboard from '@/components/dashboard/Dashboard';
 import CentroDescargas from '@/components/downloads/CentroDescargas';
 import Navegacion from '@/components/layout/Navegacion';
@@ -27,17 +28,27 @@ export default function Pagina() {
   const dataset = useDataset();
   const seccionVariables = useRef(null);
 
+  const irAResultados = useCallback(() => {
+    requestAnimationFrame(() => {
+      seccionVariables.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, []);
+
   const alSubir = useCallback(
     async (archivo) => {
       const respuesta = await dataset.subir(archivo);
       // Tras un análisis correcto se lleva al usuario al resultado.
-      if (respuesta) {
-        requestAnimationFrame(() => {
-          seccionVariables.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
-      }
+      if (respuesta) irAResultados();
     },
-    [dataset],
+    [dataset, irAResultados],
+  );
+
+  const alAbrirDelHistorial = useCallback(
+    (respuesta) => {
+      dataset.adoptar(respuesta);
+      irAResultados();
+    },
+    [dataset, irAResultados],
   );
 
   const { metadatos, informe, columnas, filas, filasFiltradas, filtros } = dataset;
@@ -97,6 +108,22 @@ export default function Pagina() {
               ))}
             </div>
           )}
+        </Seccion>
+
+        {/* ---------------------------------------------------------------- */}
+        <Seccion
+          id="historial"
+          icono="reiniciar"
+          titulo="Historial de análisis"
+          descripcion="Los archivos que analice quedan guardados en este navegador para volver a abrirlos sin buscarlos de nuevo."
+          className="pt-20"
+        >
+          <Tarjeta padding="p-5 sm:p-6">
+            <PanelHistorial
+              onAbrirAnalisis={alAbrirDelHistorial}
+              recargar={dataset.version}
+            />
+          </Tarjeta>
         </Seccion>
 
         {dataset.hayDatos && (

@@ -8,21 +8,36 @@ Arranque en desarrollo:
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import datasets, health, samples
+from app.api.routes import datasets, health, history, samples
 from app.core.config import settings
 from app.core.errors import DataEngineError
+from app.db import base as db
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s")
 logger = logging.getLogger("motor-datos")
 
 
+@asynccontextmanager
+async def ciclo_de_vida(_: FastAPI):
+    """Prepara la base de datos al arrancar y libera el pool al apagar.
+
+    El historial es opcional: si no hay DATABASE_URL o la conexión falla, el
+    servicio arranca igual y sólo se desactiva esa función.
+    """
+    db.inicializar()
+    yield
+    db.cerrar()
+
+
 def crear_app() -> FastAPI:
     app = FastAPI(
+        lifespan=ciclo_de_vida,
         title=settings.app_name,
         version=settings.version,
         description=(
@@ -65,6 +80,7 @@ def crear_app() -> FastAPI:
     api_prefix = "/api"
     app.include_router(health.router, prefix=api_prefix)
     app.include_router(datasets.router, prefix=api_prefix)
+    app.include_router(history.router, prefix=api_prefix)
     app.include_router(samples.router, prefix=api_prefix)
 
     @app.get("/", include_in_schema=False)

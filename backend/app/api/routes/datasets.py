@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 
 import pandas as pd
-from fastapi import APIRouter, File, Form, Query, UploadFile
+from fastapi import APIRouter, File, Form, Header, Query, UploadFile
 from fastapi.responses import Response
 
 from app.core.config import settings
@@ -19,7 +19,7 @@ from app.models.schemas import (
     SolicitudAnalisis,
     TablasFrecuencia,
 )
-from app.services import export, ingestion, scraping
+from app.services import export, history, ingestion, scraping
 from app.services.classification import clasificar_dataframe
 from app.services.filtering import aplicar_filtros
 from app.services.statistics import (
@@ -52,32 +52,29 @@ def _construir_informe(
     )
 
 
-@router.post("", response_model=RespuestaCarga, summary="Subir y analizar un archivo")
-async def subir_dataset(
-    archivo: Annotated[UploadFile, File(description="Archivo .xlsx, .xls o .csv")],
-    hoja: Annotated[str | None, Form()] = None,
+def procesar_contenido(
+    *,
+    contenido: bytes,
+    nombre_archivo: str,
+    hoja: str | None,
+    cliente: str | None,
 ) -> RespuestaCarga:
-    contenido = await archivo.read()
+    """Analiza unos bytes y devuelve el informe completo.
 
-    if len(contenido) > settings.max_upload_bytes:
-        limite_mb = settings.max_upload_bytes / (1024 * 1024)
-        raise FileTooLargeError(
-            f"El archivo supera el límite de {limite_mb:.0f} MB.",
-            detail="Reduzca el número de filas o divida el archivo.",
-        ).as_http()
-    if not contenido:
-        raise EmptyDatasetError("El archivo está vacío.").as_http()
+    Lo comparten la subida de un archivo nuevo y la reapertura de una entrada
+    del historial, de modo que un análisis recuperado pasa exactamente por el
+    mismo camino que uno recién subido.
 
-    try:
-        resultado = ingestion.leer_dataset(contenido, archivo.filename or "datos.xlsx", hoja)
-    except DataEngineError as error:
-        raise error.as_http() from error
+    Con `cliente` se guarda además una copia en el historial; al reabrir se pasa
+    ``None`` para no duplicar la entrada existente.
+    """
+    resultado = ingestion.leer_dataset(contenido, nombre_archivo, hoja)
 
     clasificaciones = clasificar_dataframe(resultado.df)
     registro = almacen.guardar(
         resultado.df,
         clasificaciones,
-        nombre_archivo=archivo.filename or "datos.xlsx",
+        nombre_archivo=nombre_archivo,
         hoja=resultado.hoja,
         tamano_bytes=len(contenido),
         filas_originales=resultado.filas_originales,
@@ -85,6 +82,23 @@ async def subir_dataset(
     )
 
     informe = _construir_informe(registro, resultado.df, 0)
+
+    if cliente:
+        resumen_tipos: dict[str, int] = {}
+        for columna in informe.columnas:
+            clave = columna.tipo.value
+            resumen_tipos[clave] = resumen_tipos.get(clave, 0) + 1
+
+        history.guardar(
+            cliente=cliente,
+            nombre_archivo=nombre_archivo,
+            hoja=resultado.hoja,
+            contenido=contenido,
+            filas=int(len(resultado.df)),
+            columnas=int(resultado.df.shape[1]),
+            resumen_tipos=resumen_tipos,
+        )
+
     truncado = len(resultado.df) > settings.preview_rows
     avisos = list(resultado.avisos)
     if truncado:
@@ -113,6 +127,34 @@ async def subir_dataset(
         filas=filas_serializables(resultado.df, settings.preview_rows),
         avisos=avisos,
     )
+
+
+@router.post("", response_model=RespuestaCarga, summary="Subir y analizar un archivo")
+async def subir_dataset(
+    archivo: Annotated[UploadFile, File(description="Archivo .xlsx, .xls o .csv")],
+    hoja: Annotated[str | None, Form()] = None,
+    x_cliente: Annotated[str | None, Header()] = None,
+) -> RespuestaCarga:
+    contenido = await archivo.read()
+
+    if len(contenido) > settings.max_upload_bytes:
+        limite_mb = settings.max_upload_bytes / (1024 * 1024)
+        raise FileTooLargeError(
+            f"El archivo supera el límite de {limite_mb:.0f} MB.",
+            detail="Reduzca el número de filas o divida el archivo.",
+        ).as_http()
+    if not contenido:
+        raise EmptyDatasetError("El archivo está vacío.").as_http()
+
+    try:
+        return procesar_contenido(
+            contenido=contenido,
+            nombre_archivo=archivo.filename or "datos.xlsx",
+            hoja=hoja,
+            cliente=(x_cliente or "").strip() or None,
+        )
+    except DataEngineError as error:
+        raise error.as_http() from error
 
 
 @router.post(

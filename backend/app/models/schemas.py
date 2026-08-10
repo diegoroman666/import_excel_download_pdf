@@ -244,6 +244,28 @@ class CatalogoMuestras(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Historial persistido
+# ---------------------------------------------------------------------------
+class EntradaHistorial(BaseModel):
+    """Un análisis guardado, tal como se lista en la interfaz."""
+
+    id: str
+    nombre_archivo: str
+    hoja: str | None = None
+    filas: int
+    columnas: int
+    tamano_bytes: int
+    creado_en: str
+    resumen_tipos: dict[str, int] = Field(default_factory=dict)
+
+
+class ListaHistorial(BaseModel):
+    disponible: bool
+    entradas: list[EntradaHistorial] = Field(default_factory=list)
+    motivo: str | None = None
+
+
+# ---------------------------------------------------------------------------
 # Validación por scraping simulado
 # ---------------------------------------------------------------------------
 class SeveridadHallazgo(str, Enum):
