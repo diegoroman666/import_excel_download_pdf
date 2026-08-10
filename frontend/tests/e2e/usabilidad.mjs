@@ -137,6 +137,63 @@ async function main() {
     await panel.locator('p').last().waitFor({ state: 'visible' });
   });
 
+  // --- Historial ----------------------------------------------------------
+  // El historial requiere base de datos. Sin ella la aplicación debe seguir
+  // funcionando y explicarlo, así que la suite comprueba el modo que toque.
+  const historial = await fetch(`${BASE_URL}/api/historial`, {
+    headers: { 'X-Cliente': 'suite-usabilidad' },
+  })
+    .then((r) => r.json())
+    .catch(() => ({ disponible: false }));
+
+  if (!historial.disponible) {
+    await comprobar('Sin base de datos, el historial se explica en lugar de fallar', async () => {
+      await irASeccion(pagina, 'historial');
+      const texto = await pagina.locator('#historial').innerText();
+      afirmar(
+        texto.toLowerCase().includes('base de datos'),
+        'no se explica por qué no hay historial',
+      );
+      return 'modo sin persistencia';
+    });
+  } else {
+  await comprobar('El análisis subido aparece en el historial', async () => {
+    await irASeccion(pagina, 'historial');
+    await pagina.waitForSelector('[data-testid="entrada-historial"]', { timeout: 15000 });
+    const entradas = await pagina.locator('[data-testid="entrada-historial"]').count();
+    afirmar(entradas >= 1, 'el historial quedó vacío tras subir un archivo');
+    const texto = await pagina.locator('[data-testid="panel-historial"]').innerText();
+    afirmar(texto.includes('ventas-retail.csv'), 'no aparece el nombre del archivo');
+    return `${entradas} entrada(s)`;
+  });
+
+  await comprobar('Un análisis guardado se puede reabrir', async () => {
+    await pagina.locator('[data-testid="entrada-historial"] button:has-text("Abrir")').first().click();
+    // Al reabrirlo se reprocesa y vuelven a pintarse las fichas de variables.
+    await pagina.waitForSelector('[data-testid="tarjeta-columna"]', { timeout: 30000 });
+    const columnas = await pagina.locator('[data-testid="tarjeta-columna"]').count();
+    afirmar(columnas === 10, `se esperaban 10 columnas al reabrir, hay ${columnas}`);
+  });
+
+  await comprobar('Una entrada del historial se puede borrar', async () => {
+    await irASeccion(pagina, 'historial');
+    const antes = await pagina.locator('[data-testid="entrada-historial"]').count();
+
+    await pagina.locator('[data-testid="entrada-historial"]').first()
+      .locator('button[aria-label^="Borrar"]').click();
+    await pagina.locator('button:has-text("Confirmar")').first().click();
+
+    await pagina.waitForFunction(
+      (previo) =>
+        document.querySelectorAll('[data-testid="entrada-historial"]').length < previo,
+      antes,
+      { timeout: 10000 },
+    );
+    const despues = await pagina.locator('[data-testid="entrada-historial"]').count();
+    return `${antes} → ${despues} entradas`;
+  });
+  }
+
   // --- Dashboard ----------------------------------------------------------
   await comprobar('El dashboard muestra métricas', async () => {
     await irASeccion(pagina, 'dashboard');

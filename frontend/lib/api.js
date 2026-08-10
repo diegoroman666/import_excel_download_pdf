@@ -8,6 +8,38 @@
 
 const BASE = '/api';
 
+/**
+ * Identificador anónimo del navegador.
+ *
+ * Permite que el historial de cada persona sea suyo sin obligar a crear una
+ * cuenta. No es autenticación —quien quiera puede fabricarse uno—, pero impide
+ * que los archivos de un visitante aparezcan en el navegador de otro, que es el
+ * riesgo real en una aplicación sin registro.
+ */
+const CLAVE_CLIENTE = 'procesador-datos:cliente';
+
+export function idCliente() {
+  if (typeof window === 'undefined') return '';
+
+  try {
+    let identificador = window.localStorage.getItem(CLAVE_CLIENTE);
+    if (!identificador) {
+      identificador = crypto.randomUUID();
+      window.localStorage.setItem(CLAVE_CLIENTE, identificador);
+    }
+    return identificador;
+  } catch {
+    // Navegación privada o almacenamiento bloqueado: se sigue sin historial.
+    return '';
+  }
+}
+
+/** Cabeceras comunes, con el identificador de cliente cuando existe. */
+function cabeceras(extra = {}) {
+  const identificador = idCliente();
+  return identificador ? { ...extra, 'X-Cliente': identificador } : extra;
+}
+
 /** Error de API con el mensaje legible que devuelve el backend. */
 export class ApiError extends Error {
   constructor(mensaje, { estado, detalle } = {}) {
@@ -60,7 +92,12 @@ export async function subirArchivo(archivo, { hoja, señal } = {}) {
   formulario.append('archivo', archivo);
   if (hoja) formulario.append('hoja', hoja);
 
-  return pedirJson('/datasets', { method: 'POST', body: formulario, signal: señal });
+  return pedirJson('/datasets', {
+    method: 'POST',
+    body: formulario,
+    headers: cabeceras(),
+    signal: señal,
+  });
 }
 
 /** Recalcula el informe aplicando filtros. */
@@ -111,6 +148,30 @@ export async function descargarExport(datasetId, formato, { filtros = [] } = {})
   const cabecera = respuesta.headers.get('content-disposition') || '';
   const coincidencia = cabecera.match(/filename="?([^";]+)"?/i);
   guardarBlob(blob, coincidencia?.[1] || `datos.${formato === 'csv' ? 'csv' : 'xlsx'}`);
+}
+
+/** Análisis guardados en el historial de este navegador. */
+export async function obtenerHistorial({ señal } = {}) {
+  return pedirJson('/historial', { headers: cabeceras(), signal: señal });
+}
+
+/** Reabre un análisis guardado; devuelve el mismo payload que una subida. */
+export async function abrirDelHistorial(entradaId, { señal } = {}) {
+  return pedirJson(`/historial/${entradaId}/abrir`, {
+    method: 'POST',
+    headers: cabeceras(),
+    signal: señal,
+  });
+}
+
+/** Borra una entrada del historial. */
+export async function eliminarDelHistorial(entradaId) {
+  return pedirJson(`/historial/${entradaId}`, { method: 'DELETE', headers: cabeceras() });
+}
+
+/** Vacía el historial de este navegador. */
+export async function vaciarHistorial() {
+  return pedirJson('/historial', { method: 'DELETE', headers: cabeceras() });
 }
 
 /** Libera el dataset en el servidor (mejor esfuerzo). */

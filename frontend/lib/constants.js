@@ -68,6 +68,7 @@ export const PALETA = [
 export const SECCIONES = [
   { id: 'inicio', etiqueta: 'Inicio' },
   { id: 'cargar', etiqueta: 'Cargar datos' },
+  { id: 'historial', etiqueta: 'Historial' },
   { id: 'variables', etiqueta: 'Variables' },
   { id: 'dashboard', etiqueta: 'Dashboard' },
   { id: 'estadistica', etiqueta: 'Estadística' },

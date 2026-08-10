@@ -14,16 +14,16 @@ La aplicación son **dos servicios**:
 Netlify Functions admite **JavaScript, TypeScript y Go**. Python no es un
 runtime nativo, así que no hay forma de ejecutar allí FastAPI ni Pandas.
 
-Esto no depende de tener o no una base de datos: **la aplicación no usa base de
-datos**. Analiza el archivo que se sube y devuelve los resultados; los datasets
-viven en memoria una hora y se descartan. Añadir Netlify DB no haría que el
-motor arrancara, porque lo que falta es un intérprete de Python.
+Tener una base de datos no cambia nada al respecto: la base de datos sólo añade
+el historial (véase más abajo), pero el análisis lo hace Pandas y Pandas
+necesita Python. Provisionar una base de datos en Netlify no haría arrancar el
+motor allí.
 
 > Si prefiere tener absolutamente todo en Netlify, la única vía es reescribir el
 > motor en TypeScript como Netlify Functions. Implicaría reimplementar la
 > ingesta de Excel, la clasificación de variables, la estadística descriptiva,
 > las tablas de frecuencia, los filtros y la validación, y perder Pandas junto
-> con las 104 pruebas de `pytest`. Es una decisión de arquitectura, no un ajuste
+> con las 122 pruebas de `pytest`. Es una decisión de arquitectura, no un ajuste
 > de configuración.
 
 ---
@@ -35,10 +35,12 @@ que ejecute contenedores. Todos los citados tienen plan gratuito.
 
 ### Opción rápida: Render (blueprint incluido)
 
-`render.yaml` describe el servicio ya configurado:
+`render.yaml` describe el servicio **y la base de datos del historial**, ya
+conectados entre sí:
 
 1. En Render: **New → Blueprint** y seleccione este repositorio.
-2. Render lee `render.yaml` y crea el servicio. No hay que rellenar nada.
+2. Render crea el servicio web y un PostgreSQL, e inyecta `DATABASE_URL` por su
+   cuenta. No hay que rellenar nada ni copiar credenciales.
 3. Al terminar, copie la URL del servicio (`https://ALGO.onrender.com`).
 
 Compruebe que responde:
@@ -107,23 +109,60 @@ Con las dos piezas en marcha, verifique en este orden:
 2. La sección **Descargas** lista 5 archivos Excel y 5 CSV.
 3. Descargue una muestra y súbala: deben aparecer las fichas de clasificación.
 4. Aplique un filtro y confirme que métricas y gráficos cambian.
+5. En **Historial** debe figurar el archivo recién subido, con sus botones de
+   abrir y borrar. Si dice que el historial no está disponible, falta
+   `DATABASE_URL` en el motor.
 
 ---
 
-## Sobre Netlify DB
+## Base de datos e historial
 
-Netlify DB (Postgres gestionado por Neon) existe y se provisiona con
-`netlify db init` o desde el panel, pero **hoy la aplicación no la necesita ni
-la usaría**: no hay ninguna consulta SQL en el código.
+La aplicación **funciona sin base de datos**: se sube un archivo, se analiza y
+se descargan los resultados. Con una base de datos se activa además el
+**historial**, que conserva los archivos analizados para reabrirlos o borrarlos.
 
-Tendría sentido si quisiera añadir funcionalidad que ahora no existe:
+La conexión se toma de `DATABASE_URL`, **en el servicio del motor de datos**.
+No va en Netlify: la interfaz nunca habla con la base de datos, sólo con el
+motor.
 
-- Historial de archivos analizados, para recuperar un análisis anterior.
-- Enlaces permanentes para compartir un análisis.
-- Cuentas de usuario.
+### Con el blueprint de Render
 
-Eso son funciones nuevas, con su modelo de datos y su interfaz. Si le interesan,
-conviene abordarlas como un trabajo aparte una vez que el motor esté en marcha.
+`render.yaml` ya declara un Postgres y lo conecta al servicio mediante
+`fromDatabase`, así que la cadena de conexión se inyecta sola y no hay que
+copiar ninguna credencial.
+
+> **El Postgres gratuito de Render caduca 30 días después de crearse.** Pasado
+> ese plazo quedan 14 días para pasarlo a un plan de pago; después Render lo
+> borra con todos sus datos. Para un historial que deba durar, conviene un
+> proveedor sin caducidad.
+
+### Con otro proveedor (sin caducidad)
+
+Sirve cualquier PostgreSQL. Neon —lo que hay detrás de Netlify DB— tiene un
+plan gratuito que no caduca, y su cadena de conexión se puede usar desde el
+motor alojado en Render:
+
+1. Borre el bloque `databases:` de `render.yaml`.
+2. Cambie el `fromDatabase` de `DATABASE_URL` por `sync: false`.
+3. Pegue la cadena de conexión en el panel de Render, en las variables del
+   servicio.
+
+Se admiten los tres esquemas habituales (`postgres://`, `postgresql://` y
+`postgresql+psycopg://`): el motor los normaliza al arrancar.
+
+### Cómo funciona el historial
+
+- Se guarda el **archivo original comprimido**, no el análisis ya calculado. Al
+  reabrirlo se reprocesa con el código vigente, así que una entrada antigua
+  nunca queda descrita por una versión anterior del motor.
+- Cada navegador tiene un identificador anónimo (`localStorage`) que viaja en la
+  cabecera `X-Cliente`. No hay cuentas, pero el historial de una persona no
+  aparece en el navegador de otra.
+- Límites configurables: `MAX_BYTES_HISTORIAL` (8 MB por archivo) y
+  `MAX_HISTORIAL` (25 análisis por navegador; al superarlo se descartan los más
+  antiguos).
+- Si la base de datos no está disponible, la interfaz lo explica y **el resto de
+  la aplicación sigue funcionando igual**.
 
 ---
 
@@ -135,4 +174,6 @@ conviene abordarlas como un trabajo aparte una vez que el motor esté en marcha.
 | Error de CORS en la consola | `CORS_ORIGINS` del motor no incluye el dominio de Netlify |
 | `/api/salud` da 502 | El motor está caído o dormido (los planes gratuitos suspenden el servicio por inactividad; la primera petición tarda unos segundos) |
 | El build de Netlify no encuentra `package.json` | Se sobreescribió el directorio base; debe ser `frontend` |
-| Los datos «se pierden» tras un rato | Comportamiento esperado: los datasets viven en memoria una hora (`DATASET_TTL_SECONDS`) |
+| Los datos «se pierden» tras un rato | Comportamiento esperado: los datasets viven en memoria una hora (`DATASET_TTL_SECONDS`). El historial, en cambio, es persistente |
+| El historial aparece como no disponible | Falta `DATABASE_URL` en el motor, o la conexión falló (revise los registros del servicio) |
+| El historial desapareció de golpe | Si usa el Postgres gratuito de Render, pudo caducar a los 30 días |

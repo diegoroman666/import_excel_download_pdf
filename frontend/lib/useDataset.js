@@ -32,11 +32,27 @@ export default function useDataset() {
   const [datos, setDatos] = useState(ESTADO_INICIAL);
   const [filtros, setFiltros] = useState([]);
   const [subiendo, setSubiendo] = useState(false);
+  // Cambia tras cada carga para que el historial se vuelva a consultar.
+  const [version, setVersion] = useState(0);
   const [recalculando, setRecalculando] = useState(false);
   const [error, setError] = useState(null);
 
   const peticionAnalisis = useRef(null);
   const peticionSubida = useRef(null);
+
+  /** Adopta una respuesta del backend como dataset activo. */
+  const adoptar = useCallback((respuesta) => {
+    setDatos({
+      metadatos: respuesta.metadatos,
+      informe: respuesta.informe,
+      filas: respuesta.filas,
+      columnasOrden: respuesta.columnas_orden,
+      avisos: respuesta.avisos ?? [],
+    });
+    setFiltros([]);
+    setError(null);
+    setVersion((previa) => previa + 1);
+  }, []);
 
   // --- Carga de archivo ----------------------------------------------------
   const subir = useCallback(async (archivo) => {
@@ -49,14 +65,7 @@ export default function useDataset() {
 
     try {
       const respuesta = await api.subirArchivo(archivo, { señal: control.signal });
-      setDatos({
-        metadatos: respuesta.metadatos,
-        informe: respuesta.informe,
-        filas: respuesta.filas,
-        columnasOrden: respuesta.columnas_orden,
-        avisos: respuesta.avisos ?? [],
-      });
-      setFiltros([]);
+      adoptar(respuesta);
       return respuesta;
     } catch (causa) {
       if (causa?.name === 'AbortError') return null;
@@ -68,7 +77,7 @@ export default function useDataset() {
         setSubiendo(false);
       }
     }
-  }, []);
+  }, [adoptar]);
 
   const reiniciar = useCallback(() => {
     peticionSubida.current?.abort();
@@ -188,6 +197,8 @@ export default function useDataset() {
 
     // Acciones
     subir,
+    adoptar,
     reiniciar,
+    version,
   };
 }
