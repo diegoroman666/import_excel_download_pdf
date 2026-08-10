@@ -1,0 +1,33 @@
+# Configuración de despliegue en Netlify.
+#
+# La interfaz vive en `frontend/`, no en la raíz del repositorio, así que hay
+# que declarar el directorio base: sin esto Netlify busca un package.json en la
+# raíz y el build falla.
+#
+# IMPORTANTE: la aplicación necesita el motor de datos (backend/, FastAPI) en
+# marcha. Netlify no ejecuta Python, por lo que ese servicio debe estar alojado
+# aparte y su URL indicada en la variable BACKEND_URL. Véase docs/despliegue.md.
+
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+  # Evita que npm intente descargar navegadores de Playwright en el build:
+  # sólo hacen falta para las pruebas de usabilidad, no para compilar.
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
+
+# Runtime oficial de Next.js: gestiona el renderizado en servidor, las rutas
+# dinámicas y las reescrituras declaradas en next.config.mjs.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Cabeceras de seguridad básicas para el sitio publicado.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "SAMEORIGIN"
+    Referrer-Policy = "strict-origin-when-cross-origin"

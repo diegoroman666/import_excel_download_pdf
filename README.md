@@ -92,6 +92,14 @@ el código. Para apuntar a otro host, defina `BACKEND_URL` (véase `.env.example
 
 ---
 
+### Despliegue
+
+`netlify.toml` deja la interfaz lista para publicarse en Netlify. El motor de
+datos es un servicio Python y necesita un alojamiento aparte; el procedimiento
+completo está en [`docs/despliegue.md`](docs/despliegue.md).
+
+---
+
 ## Funcionalidad
 
 ### Adjuntador inteligente
