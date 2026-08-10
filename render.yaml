@@ -1,0 +1,28 @@
+# Blueprint de Render para el motor de datos.
+#
+# Uso: en Render → New → Blueprint → seleccione este repositorio. Render lee
+# este archivo y crea el servicio ya configurado.
+#
+# Tras el primer despliegue hay que hacer dos cosas:
+#   1. Copiar la URL del servicio (https://ALGO.onrender.com).
+#   2. Ponerla en Netlify como BACKEND_URL y volver a desplegar el sitio.
+#
+# El valor de CORS_ORIGINS de abajo apunta al sitio de Netlify actual; si usa
+# un dominio propio, añádalo separado por comas.
+
+services:
+  - type: web
+    name: motor-datos-inteligente
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: oregon
+    healthCheckPath: /api/salud
+    envVars:
+      - key: CORS_ORIGINS
+        value: https://excelviewanddownloadtopdf.netlify.app
+      - key: MAX_UPLOAD_BYTES
+        value: "26214400"
+      # El plan gratuito de Render duerme el servicio tras 15 minutos sin
+      # tráfico; la primera petición después tarda unos segundos en responder.
