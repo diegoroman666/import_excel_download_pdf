@@ -1,24 +1,56 @@
-# Logs
-logs
+# --- Node / Next.js -------------------------------------------------------
+node_modules/
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# Registros
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# --- Python ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Entornos virtuales (nunca deben versionarse)
+venv/
+.venv/
+.venv-*/
+env/
+ENV/
+
+# --- Entorno --------------------------------------------------------------
+.env
+.env.local
+.env*.local
 *.local
 
-# Editor directories and files
+# --- Pruebas de extremo a extremo ----------------------------------------
+tests/e2e/capturas/
+tests/e2e/resultados/
+playwright-report/
+test-results/
+
+# --- Editores y sistema ---------------------------------------------------
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
+Thumbs.db
+*.swp
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
-*.sw?

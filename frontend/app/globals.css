@@ -1,0 +1,318 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   Sistema de diseño
+   La interfaz adopta deliberadamente un único tema oscuro: el fondo animado y
+   los gráficos de Plotly comparten esa paleta, por lo que un modo claro
+   rompería la continuidad visual entre lienzo y datos.
+   ========================================================================== */
+@theme {
+  --color-abismo: #05060f;
+  --color-abismo-2: #0a0d1c;
+  --color-superficie: #101529;
+  --color-superficie-2: #161d38;
+  --color-borde: #242d52;
+  --color-borde-suave: #1a2140;
+
+  --color-tinta: #eef2ff;
+  --color-tinta-2: #b6c0e4;
+  --color-tinta-3: #7f8bb5;
+
+  --color-acento: #2dd4bf;
+  --color-acento-2: #22d3ee;
+  --color-violeta: #a78bfa;
+  --color-magenta: #f472b6;
+  --color-ambar: #fbbf24;
+  --color-lima: #a3e635;
+  --color-rojo: #fb7185;
+
+  /* Colores por tipo de variable: se reutilizan en insignias y gráficos. */
+  --color-nominal: #38bdf8;
+  --color-ordinal: #a78bfa;
+  --color-discreta: #fbbf24;
+  --color-continua: #2dd4bf;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+
+  --radius-carta: 1.25rem;
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+* {
+  min-width: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-abismo);
+  color: var(--color-tinta);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-acento) 35%, transparent);
+  color: #fff;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-acento);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Barras de desplazamiento discretas y coherentes con el tema. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-borde) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--color-borde);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--color-acento) 45%, var(--color-borde));
+  background-clip: padding-box;
+}
+
+/* ==========================================================================
+   Superficies de cristal
+   ========================================================================== */
+@utility vidrio {
+  background:
+    linear-gradient(
+      160deg,
+      color-mix(in oklab, var(--color-superficie) 88%, transparent),
+      color-mix(in oklab, var(--color-abismo-2) 92%, transparent)
+    );
+  border: 1px solid var(--color-borde-suave);
+  box-shadow:
+    0 1px 0 0 rgb(255 255 255 / 0.04) inset,
+    0 24px 60px -32px rgb(0 0 0 / 0.9);
+  backdrop-filter: blur(14px);
+}
+
+@utility vidrio-sutil {
+  background: color-mix(in oklab, var(--color-superficie) 55%, transparent);
+  border: 1px solid var(--color-borde-suave);
+  backdrop-filter: blur(10px);
+}
+
+@utility texto-degradado {
+  background: linear-gradient(
+    100deg,
+    var(--color-tinta) 0%,
+    var(--color-acento) 45%,
+    var(--color-violeta) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ==========================================================================
+   Escena 3D: profundidad real al desplazarse
+   Las secciones se animan mediante variables CSS que el hook de scroll
+   actualiza, de modo que el trabajo en JavaScript se limita a escribir un
+   número y el compositor del navegador hace el resto.
+   ========================================================================== */
+@utility escena-3d {
+  perspective: 1400px;
+  perspective-origin: 50% 45%;
+  transform-style: preserve-3d;
+}
+
+.capa-3d {
+  /* --progreso: 0 fuera de vista, 1 centrada en el viewport. */
+  --progreso: 0;
+  --giro: 9deg;
+  --profundidad: 130px;
+
+  transform: translate3d(0, calc((1 - var(--progreso)) * 42px), calc(var(--progreso) * var(--profundidad) - var(--profundidad)))
+    rotateX(calc((1 - var(--progreso)) * var(--giro)))
+    scale(calc(0.955 + var(--progreso) * 0.045));
+  opacity: calc(0.35 + var(--progreso) * 0.65);
+  transform-origin: 50% 100%;
+  will-change: transform, opacity;
+}
+
+/* La opacidad sí se suaviza, pero la transformación no lleva transición: el
+   propio scroll aporta la continuidad, y una transición dejaría el contenido
+   desplazado durante unos fotogramas después de asentarse, con la consiguiente
+   pérdida de precisión al pulsar. */
+.capa-3d[data-visible='true'] {
+  transition: opacity 220ms ease-out;
+}
+
+/* Una vez revelada, la capa vuelve a ser un elemento plano.
+   Es imprescindible: mientras hay una transformación 3D activa el navegador
+   sitúa el contenido en un plano proyectado, y las coordenadas de las pulsaciones
+   dejan de coincidir con lo que se ve, de modo que los controles del interior
+   se vuelven inoperables. Al asentarse se elimina la transformación y el
+   comportamiento del puntero vuelve a ser el normal. */
+.capa-3d[data-asentada='true'] {
+  transform: none;
+  opacity: 1;
+}
+
+/* Tarjeta que se inclina siguiendo el puntero. */
+.tarjeta-tilt {
+  --tilt-x: 0deg;
+  --tilt-y: 0deg;
+  --brillo-x: 50%;
+  --brillo-y: 50%;
+
+  transform: perspective(900px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  transform-style: preserve-3d;
+  position: relative;
+}
+
+.tarjeta-tilt::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 260ms ease;
+  background: radial-gradient(
+    420px circle at var(--brillo-x) var(--brillo-y),
+    color-mix(in oklab, var(--color-acento) 16%, transparent),
+    transparent 60%
+  );
+}
+
+.tarjeta-tilt[data-activa='true']::after {
+  opacity: 1;
+}
+
+.elevar-contenido {
+  transform: translateZ(38px);
+  transform-style: preserve-3d;
+}
+
+/* ==========================================================================
+   Animaciones
+   ========================================================================== */
+@keyframes flotar {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes pulso-borde {
+  0%, 100% { border-color: var(--color-borde-suave); }
+  50% { border-color: color-mix(in oklab, var(--color-acento) 60%, var(--color-borde)); }
+}
+
+@keyframes barrido {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(200%); }
+}
+
+@keyframes aparecer {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes girar {
+  to { transform: rotate(360deg); }
+}
+
+.animar-flotar { animation: flotar 6s ease-in-out infinite; }
+.animar-aparecer { animation: aparecer 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animar-girar { animation: girar 900ms linear infinite; }
+
+.barrido-carga {
+  position: relative;
+  overflow: hidden;
+}
+
+.barrido-carga::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--color-acento) 22%, transparent),
+    transparent
+  );
+  animation: barrido 1.35s ease-in-out infinite;
+}
+
+/* ==========================================================================
+   Accesibilidad: respetar la preferencia de movimiento reducido
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .capa-3d {
+    transform: none !important;
+    opacity: 1 !important;
+  }
+
+  .tarjeta-tilt {
+    transform: none !important;
+  }
+
+  .barrido-carga::after {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+   Plotly: integración con el tema
+   ========================================================================== */
+.js-plotly-plot .plotly .modebar {
+  background: transparent !important;
+}
+
+.js-plotly-plot .plotly .modebar-btn path {
+  fill: var(--color-tinta-3) !important;
+}
+
+.js-plotly-plot .plotly .modebar-btn:hover path {
+  fill: var(--color-acento) !important;
+}
+
+/* Impresión: fondo claro y sin efectos. */
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  .sin-impresion {
+    display: none !important;
+  }
+}
