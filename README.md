@@ -94,9 +94,11 @@ el código. Para apuntar a otro host, defina `BACKEND_URL` (véase `.env.example
 
 ### Despliegue
 
-`netlify.toml` deja la interfaz lista para publicarse en Netlify. El motor de
-datos es un servicio Python y necesita un alojamiento aparte; el procedimiento
-completo está en [`docs/despliegue.md`](docs/despliegue.md).
+Son dos servicios: `netlify.toml` deja la interfaz lista para Netlify, y
+`backend/Dockerfile` (con blueprint `render.yaml` incluido) despliega el motor
+de datos en cualquier proveedor de contenedores. Netlify Functions sólo admite
+JavaScript, TypeScript y Go, así que el motor Python va necesariamente aparte.
+Procedimiento completo en [`docs/despliegue.md`](docs/despliegue.md).
 
 ---
 
