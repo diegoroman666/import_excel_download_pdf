@@ -98,10 +98,28 @@ def _es_postgres(url: str) -> bool:
     return url.startswith("postgresql")
 
 
+def _partes(url: str):
+    """`urlsplit` tolerante: devuelve ``None`` si la cadena no es interpretable.
+
+    Una `DATABASE_URL` mal escrita es un error de configuración, no un motivo
+    para tumbar el servicio. Como `urlsplit` lanza `ValueError` ante ciertas
+    cadenas —por ejemplo si quedaron los corchetes del marcador
+    `[YOUR-PASSWORD]`, que hacen que Python intente leer el anfitrión como una
+    dirección IPv6—, todo el análisis de la URL pasa por aquí.
+    """
+    try:
+        return urlsplit(url)
+    except ValueError:
+        return None
+
+
 def _puerto(url: str) -> int | None:
     """Puerto de la URL, o ``None`` si no lo lleva o no es interpretable."""
+    partes = _partes(url)
+    if partes is None:
+        return None
     try:
-        return urlsplit(url).port
+        return partes.port
     except ValueError:  # puerto no numérico: lo dirá el driver al conectar
         return None
 
@@ -110,7 +128,10 @@ def _usa_pool_de_transaccion(url: str) -> bool:
     """`True` si la cadena apunta a un pooler en modo transacción."""
     if _puerto(url) == PUERTO_POOL_TRANSACCION:
         return True
-    parametros = dict(parse_qsl(urlsplit(url).query))
+    partes = _partes(url)
+    if partes is None:
+        return False
+    parametros = dict(parse_qsl(partes.query))
     return parametros.get("pgbouncer", "").lower() == "true"
 
 
@@ -120,11 +141,18 @@ def _sanear_parametros(url: str) -> str:
     Supabase sirve siempre por TLS, pero el valor por omisión de libpq
     (`prefer`) acepta degradar a texto plano. Fijar `require` evita que un
     fallo de negociación pase inadvertido.
+
+    Si la cadena no es interpretable se devuelve tal cual: que el fallo lo
+    reporte el driver al conectar, con el historial desactivado y el resto del
+    servicio en pie.
     """
     if not _es_postgres(url):
         return url
 
-    partes = urlsplit(url)
+    partes = _partes(url)
+    if partes is None:
+        return url
+
     parametros = [(clave, valor) for clave, valor in parse_qsl(partes.query) if clave not in PARAMETROS_AJENOS]
     if not any(clave == "sslmode" for clave, _ in parametros):
         parametros.append(("sslmode", "require"))
@@ -149,13 +177,23 @@ def _opciones_de_motor(url: str) -> dict:
 
 def _pista_de_conexion(url: str) -> str | None:
     """Explicación del fallo más habitual al conectar con Supabase."""
-    try:
-        anfitrion = urlsplit(url).hostname or ""
-    except ValueError:
+    if "[" in url or "]" in url:
+        # Se comprueba antes de analizar la URL: los corchetes son justo lo que
+        # impide analizarla.
+        return (
+            "La cadena lleva corchetes. Si copió la plantilla de Supabase, "
+            "sustituya [YOUR-PASSWORD] —corchetes incluidos— por la contraseña. "
+            "Si la contraseña los contiene de verdad, codifíquelos: [ es %5B y ] es %5D."
+        )
+
+    partes = _partes(url)
+    if partes is None:
         return (
             "La cadena no se pudo interpretar: si la contraseña lleva caracteres "
             "especiales (@ : / # ?), hay que escribirla codificada en la URL."
         )
+
+    anfitrion = partes.hostname or ""
     if anfitrion.startswith("db.") and anfitrion.endswith(".supabase.co"):
         return (
             "Esa es la conexión directa de Supabase, que sólo resuelve por IPv6. "
@@ -172,8 +210,10 @@ def hay_base_de_datos() -> bool:
 def inicializar(url: str | None = None) -> bool:
     """Crea el motor y las tablas. Devuelve ``True`` si la BD quedó lista.
 
-    Un fallo de conexión no debe tumbar el servicio: se registra y la
-    aplicación sigue funcionando sin historial.
+    Ningún problema con la base de datos —ni de conexión, ni de credenciales,
+    ni una `DATABASE_URL` mal escrita— debe tumbar el servicio: se registra y
+    la aplicación sigue funcionando sin historial. Por eso *todo* el trabajo,
+    incluido interpretar la cadena, ocurre dentro del `try`.
     """
     global _motor, _Sesion
 
@@ -182,8 +222,8 @@ def inicializar(url: str | None = None) -> bool:
         logger.info("Sin DATABASE_URL: el historial queda desactivado.")
         return False
 
-    cadena = _sanear_parametros(_normalizar_url(destino))
     try:
+        cadena = _sanear_parametros(_normalizar_url(destino))
         _motor = create_engine(
             cadena,
             pool_pre_ping=True,  # reconecta si el proveedor cerró la conexión
@@ -195,8 +235,10 @@ def inicializar(url: str | None = None) -> bool:
         logger.info("Historial activo: base de datos conectada.")
         return True
     except Exception as error:  # noqa: BLE001 - cualquier fallo desactiva el historial
-        logger.warning("No se pudo conectar con la base de datos: %s", error)
-        pista = _pista_de_conexion(cadena)
+        logger.warning("Historial desactivado, la base de datos no respondió: %s", error)
+        # La pista se calcula sobre la cadena original: si el fallo ocurrió al
+        # interpretarla, la versión saneada no llegó a existir.
+        pista = _pista_de_conexion(destino)
         if pista:
             logger.warning("%s", pista)
         _motor, _Sesion = None, None

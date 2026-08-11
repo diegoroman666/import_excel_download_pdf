@@ -266,6 +266,33 @@ def test_la_conexion_directa_de_supabase_avisa_de_que_solo_tiene_ipv6():
     assert db._pista_de_conexion(POOL_SESION) is None
 
 
+#: Cadena tal como la copia quien no sustituye el marcador de Supabase. Los
+#: corchetes hacen que `urlsplit` intente leer el anfitrión como una dirección
+#: IPv6 y lance ValueError, así que sirve de caso límite para todo el análisis.
+CON_MARCADOR = "postgresql+psycopg://postgres.ref:[YOUR-PASSWORD]@aws-0-us-west-2.pooler.supabase.com:5432/postgres"
+
+
+def test_una_cadena_con_corchetes_no_tumba_el_servicio():
+    # Un error de configuración desactiva el historial; no impide arrancar.
+    db.cerrar()
+    assert db.inicializar(CON_MARCADOR) is False
+    assert history.disponible() is False
+
+
+def test_ninguna_funcion_de_analisis_revienta_con_una_cadena_ilegible():
+    assert db._partes(CON_MARCADOR) is None
+    # Cada una devuelve algo utilizable en lugar de propagar la excepción.
+    assert db._sanear_parametros(CON_MARCADOR) == CON_MARCADOR
+    assert db._puerto(CON_MARCADOR) is None
+    assert db._usa_pool_de_transaccion(CON_MARCADOR) is False
+    assert db._opciones_de_motor(CON_MARCADOR) == {"pool_size": 5, "max_overflow": 5}
+
+
+def test_los_corchetes_se_explican_en_el_registro():
+    pista = db._pista_de_conexion(CON_MARCADOR)
+    assert pista is not None and "YOUR-PASSWORD" in pista
+
+
 def test_una_cadena_del_pooler_arranca_el_motor_sin_conectar_de_verdad():
     # Comprueba que las opciones elegidas son válidas para `create_engine`:
     # un host inexistente falla al conectar, no al construir el motor.
