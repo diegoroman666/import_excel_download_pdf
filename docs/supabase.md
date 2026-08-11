@@ -131,6 +131,28 @@ borra. Si algo falla, dice cuál es la causa probable.
 
 ## 5. Variables de entorno
 
+### Qué va dónde
+
+Nada de Supabase se copia a Netlify. Cada variable vive donde se ejecuta el
+código que la lee:
+
+| Variable | Dónde se define | Quién la lee |
+|---|---|---|
+| `DATABASE_URL` | **En el motor** (Render) | Python, al conectar con Supabase |
+| `CORS_ORIGINS` | **En el motor** (Render) | Python, al aceptar peticiones |
+| `BACKEND_URL` | **En Netlify** | Next.js, al compilar las reescrituras |
+
+La cadena de peticiones explica el reparto:
+
+```
+navegador → Netlify (interfaz) → motor en Render → Supabase (PostgreSQL)
+                        BACKEND_URL          DATABASE_URL
+```
+
+Netlify nunca habla con Supabase: sólo llama al motor. Poner `DATABASE_URL` en
+Netlify no conectaría nada —allí no hay Python que la lea— y además dejaría la
+contraseña de la base de datos en un sitio que no la necesita.
+
 ### En el motor de datos (Render o el proveedor que use)
 
 ```
@@ -145,22 +167,31 @@ y guardar; Render redespliega solo.
 
 ### En Netlify
 
+Una sola variable, y no procede de Supabase sino de Render:
+
 ```
 BACKEND_URL = https://ALGO.onrender.com
 ```
 
-Sin barra final. Después **redesplegar el sitio**: la variable se lee al
-compilar.
+Sin barra final. **Site configuration → Environment variables → Add a variable**,
+con el mismo valor para todos los contextos de despliegue.
 
-### Sobre la clave anónima y `SUPABASE_URL`
+Después hay que **volver a desplegar**: `next.config.mjs` construye la
+reescritura de `/api/*` durante la compilación, así que la variable no surte
+efecto hasta el siguiente build. **Deploys → Trigger deploy → Clear cache and
+deploy site**.
 
-**Este proyecto no las usa, y no hay que ponerlas en Netlify.**
+### La clave anónima no interviene
 
-La clave anónima sirve para hablar con las APIs de Supabase (PostgREST, Auth,
-Storage) desde el navegador. Aquí la interfaz nunca habla con Supabase: sólo
-llama al motor, y es el motor el que abre una conexión SQL con SQLAlchemy usando
-`DATABASE_URL`. Publicar la clave anónima como `NEXT_PUBLIC_*` expondría el
-proyecto en el navegador sin que ninguna función la aproveche.
+Al pulsar **Connect** en Supabase aparece una pestaña con instrucciones para
+Next.js: `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+**No aplican a este proyecto.** Sirven para aplicaciones cuyo navegador llama
+directamente a las APIs de Supabase (PostgREST, Auth, Storage); aquí el
+navegador sólo llama al motor, y es el motor el que abre una conexión SQL con
+SQLAlchemy.
+
+Definirlas en Netlify no rompería nada, pero no las leería ningún código y
+publicaría la identidad del proyecto en el navegador a cambio de nada.
 
 Resumido: **la única credencial de Supabase que se usa es `DATABASE_URL`, y vive
 en el motor, no en Netlify.**
