@@ -78,14 +78,28 @@ La última consulta del archivo devuelve la comprobación: `rls_activo = true` y
 
 ## 3. Copiar la cadena de conexión
 
-Botón **Connect**, arriba en el panel del proyecto. Ofrece tres cadenas y la
-elección importa:
+El botón **Connect** está en la barra superior del proyecto, junto al nombre.
+Abre una ventana con dos zonas bien distintas:
+
+- Arriba, fragmentos por framework (**App Frameworks**, Next.js entre ellos),
+  con `NEXT_PUBLIC_SUPABASE_URL` y la clave anónima. **No es lo que buscamos**:
+  eso sirve para aplicaciones que llaman a Supabase desde el navegador.
+- Más abajo, **Connection String**, con tres cadenas. De ahí sale la nuestra.
+
+> Si el panel cambia de aspecto y no encuentra el botón, la misma información
+> está en **Project Settings → Database → Connection string**. Elija el formato
+> **URI** (no PSQL, ni JDBC, ni los específicos de lenguaje).
+
+Las tres cadenas y su porqué:
 
 | Opción | Puerto | Red | Para este proyecto |
 |---|---|---|---|
 | Direct connection | 5432 | **Sólo IPv6** | ❌ Render no tiene IPv6 |
 | **Session pooler** | 5432 | IPv4 | ✅ **la que hay que usar** |
 | Transaction pooler | 6543 | IPv4 | Funciona, pero innecesario aquí |
+
+Supabase describe el *Session pooler* como la alternativa a la conexión directa
+«cuando se conecta desde una red IPv4». Ese es exactamente nuestro caso.
 
 Copie la de **Session pooler**. Tiene esta forma:
 
@@ -96,6 +110,15 @@ postgresql://postgres.abcdefghijklmno:[YOUR-PASSWORD]@aws-0-us-west-1.pooler.sup
 Cópiela literalmente del panel en lugar de escribirla: el usuario lleva la
 referencia del proyecto (`postgres.<ref>`) y el prefijo del anfitrión varía
 según el proyecto (`aws-0-`, `aws-1-`…).
+
+**Cómo saber que copió la correcta**, sin depender de dónde estuviera el botón:
+
+1. El anfitrión termina en `pooler.supabase.com` — si pone
+   `db.<ref>.supabase.co`, es la directa y no servirá.
+2. El usuario es `postgres.<ref>`, con punto — si es sólo `postgres`, es la
+   directa.
+3. El puerto es `5432` — si es `6543`, cogió el de transacción; funciona
+   igualmente, el motor lo detecta y se adapta.
 
 Después sustituya `[YOUR-PASSWORD]` por la contraseña del paso 1.
 
