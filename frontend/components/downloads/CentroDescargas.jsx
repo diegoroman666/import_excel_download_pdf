@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { descargarExport, obtenerMuestras } from '@/lib/api';
+import { descargarExport, guardarBlob, obtenerArchivoDeMuestra, obtenerMuestras } from '@/lib/api';
 import { describirFiltro } from '@/lib/filters';
 import { exportarPdf } from '@/lib/exportPdf';
 import { entero } from '@/lib/format';
@@ -19,7 +19,7 @@ import Cargando from '../ui/Cargando';
 import Icono from '../ui/Icono';
 import Tarjeta from '../ui/Tarjeta';
 
-function TarjetaMuestra({ muestra, formato, descargando, onDescargar }) {
+function TarjetaMuestra({ muestra, formato, descargando, analizando, ocupado, onDescargar, onAnalizar }) {
   return (
     <li className="flex items-center gap-3 rounded-xl border border-borde-suave bg-superficie/40 p-3
       transition-colors hover:border-acento/40">
@@ -39,25 +39,49 @@ function TarjetaMuestra({ muestra, formato, descargando, onDescargar }) {
         </p>
       </div>
 
-      <Boton
-        tamano="sm"
-        variante="secundario"
-        icono="descargar"
-        cargando={descargando}
-        onClick={() => onDescargar(muestra)}
-        aria-label={`Descargar ${muestra.nombre} en ${formato.toUpperCase()}`}
-      >
-        {formato.toUpperCase()}
-      </Boton>
+      <div className="flex shrink-0 items-center gap-1.5">
+        <Boton
+          tamano="sm"
+          variante="principal"
+          icono="rayo"
+          cargando={analizando}
+          disabled={ocupado}
+          onClick={() => onAnalizar(muestra)}
+          aria-label={`Analizar ${muestra.nombre} (${formato.toUpperCase()}) sin descargarlo`}
+          title="Analizar este archivo directamente"
+        >
+          Analizar
+        </Boton>
+
+        <Boton
+          tamano="sm"
+          variante="secundario"
+          icono="descargar"
+          cargando={descargando}
+          disabled={ocupado}
+          onClick={() => onDescargar(muestra)}
+          aria-label={`Descargar ${muestra.nombre} en ${formato.toUpperCase()}`}
+        >
+          {formato.toUpperCase()}
+        </Boton>
+      </div>
     </li>
   );
 }
 
-export default function CentroDescargas({ datasetId, filtros, filas, columnas, nombreArchivo }) {
+export default function CentroDescargas({
+  datasetId,
+  filtros,
+  filas,
+  columnas,
+  nombreArchivo,
+  onAnalizarMuestra,
+}) {
   const [catalogo, setCatalogo] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [descargando, setDescargando] = useState(null);
+  const [analizando, setAnalizando] = useState(null);
 
   useEffect(() => {
     const control = new AbortController();
@@ -78,22 +102,33 @@ export default function CentroDescargas({ datasetId, filtros, filas, columnas, n
     setDescargando(`${muestra.id}-${muestra.formato}`);
     setError(null);
     try {
-      const respuesta = await fetch(muestra.url);
-      if (!respuesta.ok) throw new Error(`El servidor respondió ${respuesta.status}.`);
-
-      const blob = await respuesta.blob();
-      const url = URL.createObjectURL(blob);
-      const enlace = document.createElement('a');
-      enlace.href = url;
-      enlace.download = `${muestra.id}.${muestra.formato}`;
-      document.body.appendChild(enlace);
-      enlace.click();
-      enlace.remove();
-      URL.revokeObjectURL(url);
+      const archivo = await obtenerArchivoDeMuestra(muestra);
+      guardarBlob(archivo, archivo.name);
     } catch (causa) {
       setError(`No se pudo descargar «${muestra.nombre}»: ${causa.message}`);
     } finally {
       setDescargando(null);
+    }
+  };
+
+  /**
+   * Analiza una muestra sin pasar por el disco.
+   *
+   * Se descarga en memoria y se entrega al mismo manejador que recibe los
+   * archivos adjuntados, de modo que el recorrido posterior —análisis, historial
+   * y salto a los resultados— es idéntico al de un archivo propio.
+   */
+  const analizarMuestra = async (muestra) => {
+    if (!onAnalizarMuestra) return;
+    setAnalizando(`${muestra.id}-${muestra.formato}`);
+    setError(null);
+    try {
+      const archivo = await obtenerArchivoDeMuestra(muestra);
+      await onAnalizarMuestra(archivo);
+    } catch (causa) {
+      setError(`No se pudo analizar «${muestra.nombre}»: ${causa.message}`);
+    } finally {
+      setAnalizando(null);
     }
   };
 
@@ -180,7 +215,7 @@ export default function CentroDescargas({ datasetId, filtros, filas, columnas, n
         <div className="grid gap-5 lg:grid-cols-2">
           <Tarjeta
             titulo="5 archivos Excel de muestra"
-            descripcion="Generados con Pandas. Cada uno cubre los cuatro tipos de variable."
+            descripcion="Analícelos al momento o descárguelos. Cada uno cubre los cuatro tipos de variable."
             icono="excel"
             padding="p-5"
           >
@@ -191,7 +226,10 @@ export default function CentroDescargas({ datasetId, filtros, filas, columnas, n
                   muestra={muestra}
                   formato="xlsx"
                   descargando={descargando === `${muestra.id}-xlsx`}
+                  analizando={analizando === `${muestra.id}-xlsx`}
+                  ocupado={Boolean(analizando) || Boolean(descargando)}
                   onDescargar={descargarMuestra}
+                  onAnalizar={analizarMuestra}
                 />
               ))}
             </ul>
@@ -210,7 +248,10 @@ export default function CentroDescargas({ datasetId, filtros, filas, columnas, n
                   muestra={muestra}
                   formato="csv"
                   descargando={descargando === `${muestra.id}-csv`}
+                  analizando={analizando === `${muestra.id}-csv`}
+                  ocupado={Boolean(analizando) || Boolean(descargando)}
                   onDescargar={descargarMuestra}
+                  onAnalizar={analizarMuestra}
                 />
               ))}
             </ul>

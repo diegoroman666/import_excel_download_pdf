@@ -9,8 +9,8 @@
  * `Plotly.react`, que reutiliza el lienzo existente en lugar de recrearlo.
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { CONFIG_BASE } from './theme';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { CONFIG_BASE, FONDO_EXPORTACION } from './theme';
 
 let plotlyPromesa = null;
 
@@ -22,13 +22,41 @@ function cargarPlotly() {
   return plotlyPromesa;
 }
 
-export default function PlotlyChart({ data, layout, config, altura = 420, etiqueta }) {
+function PlotlyChart({ data, layout, config, altura = 420, etiqueta }, ref) {
   const contenedor = useRef(null);
   const plotly = useRef(null);
   // El primer dibujo debe completarse antes de aceptar redimensionados.
   const dibujado = useRef(false);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
+
+  // Exportación del gráfico tal como se está viendo. Se expone hacia arriba en
+  // lugar de dibujar el botón aquí: quien coloca el gráfico es quien sabe cómo
+  // debe llamarse el archivo.
+  useImperativeHandle(ref, () => ({
+    listo: () => Boolean(plotly.current) && dibujado.current,
+
+    async descargarImagen(nombreArchivo = 'grafico') {
+      const nodo = contenedor.current;
+      if (!plotly.current || !nodo || !dibujado.current) {
+        throw new Error('El gráfico todavía se está dibujando.');
+      }
+
+      await plotly.current.downloadImage(nodo, {
+        format: 'png',
+        // El doble de resolución que en pantalla: legible al ampliarlo o
+        // pegarlo en un documento.
+        scale: 2,
+        width: nodo.clientWidth,
+        height: nodo.clientHeight,
+        filename: nombreArchivo,
+        // El tema deja el lienzo transparente para integrarse con la página; en
+        // un PNG suelto eso se vería como un fondo a cuadros o en blanco, con
+        // el texto claro ilegible.
+        setBackground: FONDO_EXPORTACION,
+      });
+    },
+  }));
 
   // Dibujo y redibujado.
   useEffect(() => {
@@ -129,3 +157,5 @@ export default function PlotlyChart({ data, layout, config, altura = 420, etique
     </div>
   );
 }
+
+export default forwardRef(PlotlyChart);

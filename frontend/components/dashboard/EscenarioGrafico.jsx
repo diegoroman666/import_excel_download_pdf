@@ -2,12 +2,47 @@
 
 /** Lienzo del gráfico activo: construye la especificación y la dibuja. */
 
-import { useMemo } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import PlotlyChart from '../charts/PlotlyChart';
+import Boton from '../ui/Boton';
 import EstadoVacio from '../ui/EstadoVacio';
 import Icono from '../ui/Icono';
 
-export default function EscenarioGrafico({ grafico, filas, seleccion, columnas, altura = 460 }) {
+/** Nombre de archivo sin caracteres problemáticos en Windows ni en macOS. */
+function nombreSeguro(texto) {
+  return (texto || 'grafico')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // tildes y diéresis ya separadas por NFD
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase() || 'grafico';
+}
+
+export default function EscenarioGrafico({
+  grafico,
+  filas,
+  seleccion,
+  columnas,
+  altura = 460,
+  nombreArchivo,
+}) {
+  const lienzo = useRef(null);
+  const [descargando, setDescargando] = useState(false);
+  const [errorDescarga, setErrorDescarga] = useState(null);
+
+  const descargarImagen = useCallback(async () => {
+    setDescargando(true);
+    setErrorDescarga(null);
+    try {
+      const partes = [nombreArchivo, grafico.id, seleccion.x, seleccion.y].filter(Boolean);
+      await lienzo.current?.descargarImagen(nombreSeguro(partes.join('-')));
+    } catch (causa) {
+      setErrorDescarga(causa?.message || 'No se pudo generar la imagen.');
+    } finally {
+      setDescargando(false);
+    }
+  }, [grafico.id, nombreArchivo, seleccion.x, seleccion.y]);
+
   // Se memoriza sobre una cadena estable: el informe del backend devuelve un
   // array nuevo en cada sincronización aunque el esquema no haya cambiado, y
   // eso obligaría a redibujar el gráfico sin motivo.
@@ -54,6 +89,7 @@ export default function EscenarioGrafico({ grafico, filas, seleccion, columnas, 
           configuración de ejes del gráfico anterior (por ejemplo el segundo eje
           del mixto) sobrevive al cambio. */}
       <PlotlyChart
+        ref={lienzo}
         key={grafico.id}
         data={especificacion.data}
         layout={especificacion.layout}
@@ -61,12 +97,31 @@ export default function EscenarioGrafico({ grafico, filas, seleccion, columnas, 
         etiqueta={`${grafico.nombre}: ${grafico.descripcion}`}
       />
 
-      {especificacion.nota && (
-        <p className="flex items-start gap-2 text-[11px] text-tinta-3">
-          <Icono nombre="info" tamano={13} className="mt-0.5 shrink-0" />
-          {especificacion.nota}
-        </p>
-      )}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {especificacion.nota ? (
+          <p className="flex min-w-0 flex-1 items-start gap-2 text-[11px] text-tinta-3">
+            <Icono nombre="info" tamano={13} className="mt-0.5 shrink-0" />
+            {especificacion.nota}
+          </p>
+        ) : (
+          <span />
+        )}
+
+        <Boton
+          tamano="sm"
+          variante="secundario"
+          icono="descargar"
+          cargando={descargando}
+          onClick={descargarImagen}
+          aria-label="Descargar el gráfico actual como imagen PNG"
+          title="Descarga el gráfico tal como se ve ahora, con los filtros aplicados"
+          className="shrink-0"
+        >
+          Descargar gráfico
+        </Boton>
+      </div>
+
+      {errorDescarga && <p className="text-[11px] text-rojo">{errorDescarga}</p>}
     </div>
   );
 }

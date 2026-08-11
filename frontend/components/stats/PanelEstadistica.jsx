@@ -10,10 +10,11 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { obtenerFrecuencias } from '@/lib/api';
+import { descargarExport, obtenerFrecuencias } from '@/lib/api';
 import { META_TIPOS } from '@/lib/constants';
 import { entero, numero, porcentajeDirecto } from '@/lib/format';
 import Aviso from '../ui/Aviso';
+import Boton from '../ui/Boton';
 import Cargando from '../ui/Cargando';
 import EstadoVacio from '../ui/EstadoVacio';
 import Icono from '../ui/Icono';
@@ -285,6 +286,29 @@ function VistaFrecuencias({ datasetId, columna, filtros }) {
 export default function PanelEstadistica({ datasetId, columnas, filtros, recalculando }) {
   const [vista, setVista] = useState('tendencia');
   const [columnaId, setColumnaId] = useState('');
+  const [descargando, setDescargando] = useState(false);
+  const [errorDescarga, setErrorDescarga] = useState(null);
+
+  /**
+   * Descarga toda la estadística en Excel.
+   *
+   * No exporta sólo lo que se ve en pantalla —una columna y una vista—, sino el
+   * informe completo que calcula Pandas: clasificación de variables,
+   * descriptivos de cada columna y tablas de frecuencia, siempre sobre las
+   * filas que superan los filtros activos.
+   */
+  const descargarEstadistica = async () => {
+    if (!datasetId) return;
+    setDescargando(true);
+    setErrorDescarga(null);
+    try {
+      await descargarExport(datasetId, 'informe', { filtros });
+    } catch (causa) {
+      setErrorDescarga(`No se pudo descargar la estadística: ${causa.message}`);
+    } finally {
+      setDescargando(false);
+    }
+  };
 
   const numericas = useMemo(() => columnas.filter((columna) => columna.es_numerica), [columnas]);
 
@@ -334,17 +358,36 @@ export default function PanelEstadistica({ datasetId, columnas, filtros, recalcu
           })}
         </div>
 
-        <Selector
-          etiqueta="Columna"
-          valor={columnaId}
-          opciones={candidatas.map((c) => ({
-            valor: c.nombre,
-            etiqueta: `${c.nombre} · ${META_TIPOS[c.tipo]?.abreviatura ?? ''}`,
-          }))}
-          onChange={setColumnaId}
-          className="w-full sm:w-64"
-        />
+        <div className="flex flex-wrap items-end gap-2">
+          <Selector
+            etiqueta="Columna"
+            valor={columnaId}
+            opciones={candidatas.map((c) => ({
+              valor: c.nombre,
+              etiqueta: `${c.nombre} · ${META_TIPOS[c.tipo]?.abreviatura ?? ''}`,
+            }))}
+            onChange={setColumnaId}
+            className="w-full sm:w-64"
+          />
+
+          <Boton
+            icono="excel"
+            cargando={descargando}
+            disabled={!datasetId}
+            onClick={descargarEstadistica}
+            aria-label="Descargar la estadística descriptiva en Excel"
+            title="Clasificación, descriptivos y frecuencias de todas las columnas, con los filtros aplicados"
+          >
+            Descargar estadística
+          </Boton>
+        </div>
       </div>
+
+      {errorDescarga && (
+        <Aviso tono="error" onCerrar={() => setErrorDescarga(null)}>
+          {errorDescarga}
+        </Aviso>
+      )}
 
       {columna && (
         <div className="flex flex-wrap items-center gap-2 text-xs text-tinta-3">

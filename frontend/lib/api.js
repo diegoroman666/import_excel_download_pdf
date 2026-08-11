@@ -136,6 +136,30 @@ export async function obtenerMuestras({ señal } = {}) {
   return pedirJson('/muestras', { signal: señal });
 }
 
+/**
+ * Descarga una muestra y la devuelve como `File`.
+ *
+ * Se usa tanto para guardarla en el disco como para analizarla: al convertirla
+ * en `File` recorre exactamente el mismo camino que un archivo adjuntado por el
+ * usuario —misma subida, mismo análisis y mismo guardado en el historial—, así
+ * que no hay una segunda ruta de código que pueda comportarse distinto.
+ */
+export async function obtenerArchivoDeMuestra(muestra, { señal } = {}) {
+  let respuesta;
+  try {
+    respuesta = await fetch(muestra.url, { signal: señal });
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    throw new ApiError('No se pudo contactar con el motor de datos.');
+  }
+  if (!respuesta.ok) throw await extraerError(respuesta);
+
+  const blob = await respuesta.blob();
+  return new File([blob], `${muestra.id}.${muestra.formato}`, {
+    type: blob.type || 'application/octet-stream',
+  });
+}
+
 /** Descarga los datos filtrados y dispara el guardado en el navegador. */
 export async function descargarExport(datasetId, formato, { filtros = [] } = {}) {
   const respuesta = await pedir(`/datasets/${datasetId}/exportar?formato=${formato}`, {

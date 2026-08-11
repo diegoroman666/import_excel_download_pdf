@@ -161,6 +161,7 @@ export default function Pagina() {
                 onQuitarFiltro={dataset.quitarFiltro}
                 onLimpiarFiltros={dataset.limpiarFiltros}
                 recalculando={dataset.recalculando}
+                nombreArchivo={metadatos?.nombre_archivo?.replace(/\.[^.]+$/, '')}
               />
             </Seccion>
 
@@ -235,6 +236,10 @@ export default function Pagina() {
             filas={filasFiltradas}
             columnas={columnas}
             nombreArchivo={metadatos?.nombre_archivo?.replace(/\.[^.]+$/, '')}
+            // Analizar una muestra usa el mismo manejador que un archivo
+            // adjuntado: mismo análisis, mismo historial y mismo salto al
+            // resultado.
+            onAnalizarMuestra={alSubir}
           />
         </Seccion>
       </main>

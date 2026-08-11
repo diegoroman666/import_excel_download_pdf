@@ -7,6 +7,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, HTTPException, Path, status
 from fastapi.responses import Response
 
+from app.core.descargas import cabecera_descarga
 from app.models.schemas import CatalogoMuestras
 from app.services import samples
 
@@ -43,5 +44,5 @@ def descargar(
     return Response(
         content=contenido,
         media_type=_MEDIOS[formato],
-        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+        headers=cabecera_descarga(nombre),
     )
