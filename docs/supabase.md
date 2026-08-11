@@ -1,0 +1,269 @@
+# Base de datos en Supabase
+
+Guía para dejar el **historial** funcionando con un proyecto de Supabase, sin
+depender del PostgreSQL gratuito de Render (que caduca a los 30 días).
+
+---
+
+## Antes de empezar: qué resuelve Supabase y qué no
+
+| Pieza | Tecnología | Dónde va |
+|---|---|---|
+| Interfaz | Next.js | Netlify ✅ |
+| **Base de datos del historial** | PostgreSQL | **Supabase** ← esta guía |
+| Motor de datos | Python · FastAPI · Pandas | Un proveedor de contenedores |
+
+Supabase sustituye a la **base de datos**, no al motor. El análisis lo hace
+Pandas, que necesita Python: las Edge Functions de Supabase son Deno/TypeScript
+y las Netlify Functions admiten JavaScript, TypeScript y Go, así que en ninguno
+de los dos sitios puede ejecutarse FastAPI.
+
+Eso no impide quitarse de encima la caducidad, porque **lo que caducaba a los 30
+días era el PostgreSQL gratuito de Render, no su servicio web**. El plan
+gratuito de un servicio web de Render no expira: sólo duerme tras 15 minutos sin
+tráfico y tarda unos segundos en la primera petición. Combinando ambos:
+
+```
+Netlify (interfaz)  →  Render, plan free (motor)  →  Supabase (PostgreSQL)
+     no caduca              no caduca                    no caduca
+```
+
+Si prefiere otro alojamiento para el motor, `backend/Dockerfile` vale igual en
+Fly.io, Railway, Cloud Run o una VPS. Nada de esta guía cambia.
+
+---
+
+## 1. Crear el proyecto en la organización vacía
+
+El plan gratuito de Supabase permite **2 proyectos activos por organización**,
+no por cuenta. Un tercer proyecto creado dentro de la segunda organización cuenta
+contra esa organización —que está vacía— y no afecta a los dos que ya tiene.
+
+1. Entre en <https://supabase.com/dashboard>.
+2. Arriba a la izquierda, en el **selector de organización**, elija la segunda
+   organización (la que no tiene proyectos). Es el paso que decide dónde se
+   crea; si se salta, Supabase usa la organización activa y el botón de nuevo
+   proyecto aparecerá bloqueado por haber llegado al límite.
+3. **New project** y rellene:
+
+   | Campo | Valor |
+   |---|---|
+   | Name | `motor-datos-historial` |
+   | Database Password | **Genere una y guárdela** — sólo se muestra ahora |
+   | Region | La más cercana al motor. Con Render en Oregón: `West US (Oregon)` |
+   | Plan | Free |
+
+4. **Create new project** y espere a que termine de aprovisionar (1-2 minutos).
+
+> Si la contraseña se pierde, no se recupera: se cambia en
+> **Project Settings → Database → Reset database password**.
+
+---
+
+## 2. Crear la tabla
+
+**SQL Editor → New query**, pegue el contenido de
+[`supabase/schema.sql`](../supabase/schema.sql) y pulse **Run**.
+
+El motor crearía la tabla solo al arrancar, pero conviene ejecutar el archivo:
+además de la tabla aplica el blindaje de acceso, que el ORM no hace. Todo lo que
+vive en el esquema `public` queda expuesto por la API REST de Supabase, y el
+historial no debe leerse por ahí — el script revoca los permisos de `anon` y
+`authenticated` y activa RLS.
+
+La última consulta del archivo devuelve la comprobación: `rls_activo = true` y
+`sin_permisos_anonimos = true`.
+
+---
+
+## 3. Copiar la cadena de conexión
+
+El botón **Connect** está en la barra superior del proyecto, junto al nombre.
+Abre una ventana con dos zonas bien distintas:
+
+- Arriba, fragmentos por framework (**App Frameworks**, Next.js entre ellos),
+  con `NEXT_PUBLIC_SUPABASE_URL` y la clave anónima. **No es lo que buscamos**:
+  eso sirve para aplicaciones que llaman a Supabase desde el navegador.
+- Más abajo, **Connection String**, con tres cadenas. De ahí sale la nuestra.
+
+> Si el panel cambia de aspecto y no encuentra el botón, la misma información
+> está en **Project Settings → Database → Connection string**. Elija el formato
+> **URI** (no PSQL, ni JDBC, ni los específicos de lenguaje).
+
+Las tres cadenas y su porqué:
+
+| Opción | Puerto | Red | Para este proyecto |
+|---|---|---|---|
+| Direct connection | 5432 | **Sólo IPv6** | ❌ Render no tiene IPv6 |
+| **Session pooler** | 5432 | IPv4 | ✅ **la que hay que usar** |
+| Transaction pooler | 6543 | IPv4 | Funciona, pero innecesario aquí |
+
+Supabase describe el *Session pooler* como la alternativa a la conexión directa
+«cuando se conecta desde una red IPv4». Ese es exactamente nuestro caso.
+
+Copie la de **Session pooler**. Tiene esta forma:
+
+```
+postgresql://postgres.abcdefghijklmno:[YOUR-PASSWORD]@aws-0-us-west-1.pooler.supabase.com:5432/postgres
+```
+
+Cópiela literalmente del panel en lugar de escribirla: el usuario lleva la
+referencia del proyecto (`postgres.<ref>`) y el prefijo del anfitrión varía
+según el proyecto (`aws-0-`, `aws-1-`…).
+
+**Cómo saber que copió la correcta**, sin depender de dónde estuviera el botón:
+
+1. El anfitrión termina en `pooler.supabase.com` — si pone
+   `db.<ref>.supabase.co`, es la directa y no servirá.
+2. El usuario es `postgres.<ref>`, con punto — si es sólo `postgres`, es la
+   directa.
+3. El puerto es `5432` — si es `6543`, cogió el de transacción; funciona
+   igualmente, el motor lo detecta y se adapta.
+
+Después sustituya `[YOUR-PASSWORD]` por la contraseña del paso 1.
+
+> **Si la contraseña lleva caracteres especiales**, hay que codificarlos o la
+> cadena se interpreta mal:
+> `@` → `%40` · `:` → `%3A` · `/` → `%2F` · `#` → `%23` · `?` → `%3F` ·
+> `&` → `%26` · `%` → `%25`
+>
+> Es el fallo más habitual de todo este proceso. Lo más cómodo es generar una
+> contraseña sólo con letras y números.
+
+El motor acepta los tres esquemas (`postgres://`, `postgresql://` y
+`postgresql+psycopg://`), exige TLS por su cuenta y, si detecta el pooler en
+modo transacción, desactiva el pool propio y las sentencias preparadas.
+
+---
+
+## 4. Comprobar la cadena antes de desplegar
+
+Sale más barato que desplegar y mirar registros:
+
+```bash
+cd backend
+pip install -r requirements.txt
+DATABASE_URL='postgresql://postgres.abc:clave@aws-0-us-west-1.pooler.supabase.com:5432/postgres' \
+    python scripts/verificar_bd.py
+```
+
+Conecta, crea las tablas si faltan, escribe una entrada, la lee de vuelta y la
+borra. Si algo falla, dice cuál es la causa probable.
+
+---
+
+## 5. Variables de entorno
+
+### Qué va dónde
+
+Nada de Supabase se copia a Netlify. Cada variable vive donde se ejecuta el
+código que la lee:
+
+| Variable | Dónde se define | Quién la lee |
+|---|---|---|
+| `DATABASE_URL` | **En el motor** (Render) | Python, al conectar con Supabase |
+| `CORS_ORIGINS` | **En el motor** (Render) | Python, al aceptar peticiones |
+| `BACKEND_URL` | **En Netlify** | Next.js, al compilar las reescrituras |
+
+La cadena de peticiones explica el reparto:
+
+```
+navegador → Netlify (interfaz) → motor en Render → Supabase (PostgreSQL)
+                        BACKEND_URL          DATABASE_URL
+```
+
+Netlify nunca habla con Supabase: sólo llama al motor. Poner `DATABASE_URL` en
+Netlify no conectaría nada —allí no hay Python que la lea— y además dejaría la
+contraseña de la base de datos en un sitio que no la necesita.
+
+### En el motor de datos (Render o el proveedor que use)
+
+```
+DATABASE_URL = postgresql://postgres.<REF>:<CLAVE>@<REGION>.pooler.supabase.com:5432/postgres
+CORS_ORIGINS = https://excelviewanddownloadtopdf.netlify.app
+```
+
+`render.yaml` ya declara `DATABASE_URL` con `sync: false`, de modo que Render la
+pide en el panel al crear el blueprint y la credencial nunca queda escrita en el
+repositorio. Si el servicio ya existe: **Environment → Add environment variable**
+y guardar; Render redespliega solo.
+
+### En Netlify
+
+Una sola variable, y no procede de Supabase sino de Render:
+
+```
+BACKEND_URL = https://ALGO.onrender.com
+```
+
+Sin barra final. **Site configuration → Environment variables → Add a variable**,
+con el mismo valor para todos los contextos de despliegue.
+
+Después hay que **volver a desplegar**: `next.config.mjs` construye la
+reescritura de `/api/*` durante la compilación, así que la variable no surte
+efecto hasta el siguiente build. **Deploys → Trigger deploy → Clear cache and
+deploy site**.
+
+### La clave anónima no interviene
+
+Al pulsar **Connect** en Supabase aparece una pestaña con instrucciones para
+Next.js: `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+**No aplican a este proyecto.** Sirven para aplicaciones cuyo navegador llama
+directamente a las APIs de Supabase (PostgREST, Auth, Storage); aquí el
+navegador sólo llama al motor, y es el motor el que abre una conexión SQL con
+SQLAlchemy.
+
+Definirlas en Netlify no rompería nada, pero no las leería ningún código y
+publicaría la identidad del proyecto en el navegador a cambio de nada.
+
+Resumido: **la única credencial de Supabase que se usa es `DATABASE_URL`, y vive
+en el motor, no en Netlify.**
+
+---
+
+## 6. Comprobación final
+
+1. `https://ALGO.onrender.com/api/salud` → `{"estado":"ok",...}`
+2. `https://excelviewanddownloadtopdf.netlify.app/api/salud` → lo mismo.
+3. Suba un archivo y mire la sección **Historial**: debe aparecer la entrada con
+   sus botones de abrir y borrar.
+4. En Supabase, **Table Editor → `analisis_guardado`**: ahí está la fila.
+
+Si el historial dice que no está disponible, la conexión falló. El motivo exacto
+está en los registros del motor (en Render, pestaña **Logs**), y el mensaje
+incluye la pista correspondiente.
+
+---
+
+## Límites del plan gratuito de Supabase
+
+| Límite | Valor |
+|---|---|
+| Proyectos activos | 2 por organización |
+| Espacio de base de datos | 500 MB |
+| Transferencia | 5 GB al mes |
+| **Pausa por inactividad** | **7 días sin actividad** |
+
+La pausa es lo único a tener en cuenta: si nadie usa el sitio durante una
+semana, Supabase suspende el proyecto y el historial deja de responder hasta
+reactivarlo desde el panel (**Restore project**). Los datos no se pierden, y el
+resto de la aplicación —subir, analizar, descargar— sigue funcionando igual
+mientras tanto, porque el historial es opcional por diseño.
+
+Con 8 MB por archivo (`MAX_BYTES_HISTORIAL`) y 25 análisis por navegador
+(`MAX_HISTORIAL`), los 500 MB dan de sobra: los archivos se guardan comprimidos
+con gzip.
+
+---
+
+## Problemas frecuentes
+
+| Síntoma en los registros del motor | Causa |
+|---|---|
+| `Network is unreachable` / `failed to resolve host db.<ref>.supabase.co` | Está usando la conexión directa, que sólo es IPv6. Cambie a la cadena del *Session pooler* |
+| `password authentication failed` | La contraseña lleva caracteres especiales sin codificar, o quedó el literal `[YOUR-PASSWORD]` |
+| `Tenant or user not found` | El usuario del pooler debe ser `postgres.<ref>`, no `postgres` a secas |
+| `invalid connection option "pgbouncer"` | Cadena de otro panel (estilo Prisma). El motor ya descarta ese parámetro; actualice el despliegue |
+| `prepared statement "..." already exists` | Pooler en modo transacción sin desactivar preparadas. El motor lo detecta por el puerto 6543; si usó otro puerto, añada `?pgbouncer=true` a la cadena |
+| `Max client connections reached` | Demasiadas instancias del motor contra el mismo proyecto |
+| El historial funcionaba y dejó de hacerlo tras días sin uso | El proyecto se pausó por inactividad: reactívelo desde el panel |

@@ -9,6 +9,7 @@ from fastapi import APIRouter, File, Form, Header, Query, UploadFile
 from fastapi.responses import Response
 
 from app.core.config import settings
+from app.core.descargas import cabecera_descarga
 from app.core.errors import DataEngineError, EmptyDatasetError, FileTooLargeError
 from app.models.schemas import (
     InformeAnalisis,
@@ -254,7 +255,7 @@ def exportar(
     return Response(
         content=contenido,
         media_type=medio,
-        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+        headers=cabecera_descarga(nombre),
     )
 
 

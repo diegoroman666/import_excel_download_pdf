@@ -31,6 +31,7 @@ export default function Dashboard({
   onQuitarFiltro,
   onLimpiarFiltros,
   recalculando,
+  nombreArchivo,
 }) {
   const [graficoId, setGraficoId] = useState('barras');
   // Guarda lo que el usuario ha elegido de forma explícita. Los ejes que
@@ -132,6 +133,7 @@ export default function Dashboard({
                 filas={filasFiltradas}
                 seleccion={seleccion}
                 columnas={columnas}
+                nombreArchivo={nombreArchivo}
               />
             )}
           </div>

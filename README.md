@@ -103,6 +103,10 @@ de datos en cualquier proveedor de contenedores. Netlify Functions sólo admite
 JavaScript, TypeScript y Go, así que el motor Python va necesariamente aparte.
 Procedimiento completo en [`docs/despliegue.md`](docs/despliegue.md).
 
+El historial necesita además un PostgreSQL. Se usa **Supabase**, cuyo plan
+gratuito no caduca: [`docs/supabase.md`](docs/supabase.md) explica el proceso y
+[`supabase/schema.sql`](supabase/schema.sql) contiene el esquema.
+
 ---
 
 ## Funcionalidad
@@ -162,8 +166,9 @@ determinista y funciona sin conexión.
 
 ### Historial (opcional)
 
-Con una base de datos PostgreSQL configurada en `DATABASE_URL`, los archivos
-analizados quedan guardados para reabrirlos o borrarlos. Se conserva el archivo
+Con una base de datos PostgreSQL configurada en `DATABASE_URL` —Supabase, según
+[`docs/supabase.md`](docs/supabase.md)—, los archivos analizados quedan
+guardados para reabrirlos o borrarlos. Se conserva el archivo
 original comprimido y se reprocesa al abrirlo, de modo que el resultado siempre
 corresponde a la versión actual del motor. Cada navegador ve sólo su propio
 historial mediante un identificador anónimo. Sin base de datos la aplicación

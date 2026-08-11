@@ -6,6 +6,15 @@ const TINTA = '#b6c0e4';
 const TINTA_TENUE = '#7f8bb5';
 const REJILLA = '#1a2140';
 
+/**
+ * Fondo de las imágenes exportadas.
+ *
+ * En pantalla el lienzo es transparente para dejar ver el fondo animado, pero
+ * un PNG con transparencia se vuelve ilegible fuera de la aplicación: el texto
+ * del gráfico es claro y quedaría sobre blanco. Coincide con `--color-abismo`.
+ */
+export const FONDO_EXPORTACION = '#05060f';
+
 /** Configuración de la barra de herramientas y del comportamiento del lienzo. */
 export const CONFIG_BASE = {
   responsive: true,

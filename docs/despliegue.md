@@ -6,6 +6,7 @@ La aplicación son **dos servicios**:
 |---|---|---|
 | Interfaz | Next.js | Netlify ✅ *(ya desplegado)* |
 | Motor de datos | Python · FastAPI · Pandas | **Fuera de Netlify** |
+| Base de datos (opcional) | PostgreSQL | Supabase — [`docs/supabase.md`](supabase.md) |
 
 ---
 
@@ -35,13 +36,17 @@ que ejecute contenedores. Todos los citados tienen plan gratuito.
 
 ### Opción rápida: Render (blueprint incluido)
 
-`render.yaml` describe el servicio **y la base de datos del historial**, ya
-conectados entre sí:
+`render.yaml` describe el servicio web:
 
 1. En Render: **New → Blueprint** y seleccione este repositorio.
-2. Render crea el servicio web y un PostgreSQL, e inyecta `DATABASE_URL` por su
-   cuenta. No hay que rellenar nada ni copiar credenciales.
+2. Render pide el valor de `DATABASE_URL`: pegue la cadena de conexión de
+   Supabase ([cómo obtenerla](supabase.md)). Puede dejarla en blanco si de
+   momento no quiere historial.
 3. Al terminar, copie la URL del servicio (`https://ALGO.onrender.com`).
+
+El plan gratuito de un **servicio web** de Render no caduca; lo que caducaba a
+los 30 días era su PostgreSQL gratuito, y por eso la base de datos se lleva a
+Supabase. El servicio sí se duerme tras 15 minutos sin tráfico.
 
 Compruebe que responde:
 
@@ -123,32 +128,31 @@ se descargan los resultados. Con una base de datos se activa además el
 
 La conexión se toma de `DATABASE_URL`, **en el servicio del motor de datos**.
 No va en Netlify: la interfaz nunca habla con la base de datos, sólo con el
-motor.
+motor. Por lo mismo, la clave anónima de Supabase no interviene en ningún punto
+de este proyecto.
 
-### Con el blueprint de Render
+### Supabase (recomendado)
 
-`render.yaml` ya declara un Postgres y lo conecta al servicio mediante
-`fromDatabase`, así que la cadena de conexión se inyecta sola y no hay que
-copiar ninguna credencial.
+Su plan gratuito no caduca. El procedimiento completo —crear el proyecto, el
+esquema SQL, qué cadena de conexión copiar y por qué— está en
+[`docs/supabase.md`](supabase.md).
 
-> **El Postgres gratuito de Render caduca 30 días después de crearse.** Pasado
-> ese plazo quedan 14 días para pasarlo a un plan de pago; después Render lo
-> borra con todos sus datos. Para un historial que deba durar, conviene un
-> proveedor sin caducidad.
+En resumen: cree el proyecto, ejecute [`supabase/schema.sql`](../supabase/schema.sql)
+en el SQL Editor, copie la cadena del **Session pooler** (la conexión directa
+sólo resuelve por IPv6 y Render no lo tiene) y péguela en `DATABASE_URL`.
 
-### Con otro proveedor (sin caducidad)
+### Otros proveedores
 
-Sirve cualquier PostgreSQL. Neon —lo que hay detrás de Netlify DB— tiene un
-plan gratuito que no caduca, y su cadena de conexión se puede usar desde el
-motor alojado en Render:
+Sirve cualquier PostgreSQL —Neon, por ejemplo, que es lo que hay detrás de
+Netlify DB—. Basta con pegar su cadena en `DATABASE_URL`: se admiten los tres
+esquemas habituales (`postgres://`, `postgresql://` y `postgresql+psycopg://`),
+que el motor normaliza al arrancar.
 
-1. Borre el bloque `databases:` de `render.yaml`.
-2. Cambie el `fromDatabase` de `DATABASE_URL` por `sync: false`.
-3. Pegue la cadena de conexión en el panel de Render, en las variables del
-   servicio.
+Antes de desplegar, cualquier cadena se puede probar en local:
 
-Se admiten los tres esquemas habituales (`postgres://`, `postgresql://` y
-`postgresql+psycopg://`): el motor los normaliza al arrancar.
+```bash
+cd backend && DATABASE_URL='...' python scripts/verificar_bd.py
+```
 
 ### Cómo funciona el historial
 
@@ -175,5 +179,5 @@ Se admiten los tres esquemas habituales (`postgres://`, `postgresql://` y
 | `/api/salud` da 502 | El motor está caído o dormido (los planes gratuitos suspenden el servicio por inactividad; la primera petición tarda unos segundos) |
 | El build de Netlify no encuentra `package.json` | Se sobreescribió el directorio base; debe ser `frontend` |
 | Los datos «se pierden» tras un rato | Comportamiento esperado: los datasets viven en memoria una hora (`DATASET_TTL_SECONDS`). El historial, en cambio, es persistente |
-| El historial aparece como no disponible | Falta `DATABASE_URL` en el motor, o la conexión falló (revise los registros del servicio) |
-| El historial desapareció de golpe | Si usa el Postgres gratuito de Render, pudo caducar a los 30 días |
+| El historial aparece como no disponible | Falta `DATABASE_URL` en el motor, o la conexión falló (revise los registros del servicio; el mensaje incluye la causa probable) |
+| El historial dejó de responder tras días sin uso | Los proyectos gratuitos de Supabase se pausan a los 7 días de inactividad; reactívelo desde su panel |

@@ -10,6 +10,7 @@ from dataclasses import replace
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.pool import NullPool
 
 from app.db import base as db
 from app.main import app
@@ -213,6 +214,90 @@ def test_la_url_de_render_con_esquema_postgres_se_normaliza():
     assert db._normalizar_url("postgresql://u:p@h/d") == "postgresql+psycopg://u:p@h/d"
     # Una URL ya normalizada no se toca.
     assert db._normalizar_url("postgresql+psycopg://u:p@h/d") == "postgresql+psycopg://u:p@h/d"
+
+
+# ---------------------------------------------------------------------------
+# Cadena de conexión de Supabase
+# ---------------------------------------------------------------------------
+POOL_SESION = "postgresql+psycopg://postgres.ref:c@aws-0-us-west-1.pooler.supabase.com:5432/postgres"
+POOL_TRANSACCION = POOL_SESION.replace(":5432/", ":6543/")
+
+
+def test_se_exige_tls_en_postgres_y_no_se_toca_sqlite():
+    assert "sslmode=require" in db._sanear_parametros(POOL_SESION)
+    # Una preferencia explícita del usuario se respeta.
+    assert db._sanear_parametros(POOL_SESION + "?sslmode=verify-full").endswith("sslmode=verify-full")
+    # SQLite no entiende de TLS.
+    assert db._sanear_parametros("sqlite:///historial.db") == "sqlite:///historial.db"
+
+
+def test_se_descartan_los_parametros_que_libpq_no_conoce():
+    # Algunos paneles añaden `pgbouncer=true`, que psycopg rechazaría.
+    saneada = db._sanear_parametros(POOL_TRANSACCION + "?pgbouncer=true&connection_limit=1")
+    assert "pgbouncer" not in saneada
+    assert "connection_limit" not in saneada
+    assert "sslmode=require" in saneada
+
+
+def test_el_pool_de_transaccion_se_detecta_por_puerto_o_parametro():
+    assert db._usa_pool_de_transaccion(POOL_TRANSACCION) is True
+    assert db._usa_pool_de_transaccion(POOL_SESION + "?pgbouncer=true") is True
+    assert db._usa_pool_de_transaccion(POOL_SESION) is False
+
+
+def test_el_pool_de_transaccion_desactiva_pool_propio_y_sentencias_preparadas():
+    # En modo transacción cada transacción puede caer en otra conexión: ni el
+    # pool ni las sentencias preparadas sobreviven al cambio.
+    opciones = db._opciones_de_motor(POOL_TRANSACCION)
+    assert opciones["poolclass"] is NullPool
+    assert opciones["connect_args"] == {"prepare_threshold": None}
+
+    # En modo sesión (o conexión directa) sí interesa mantener el pool.
+    assert db._opciones_de_motor(POOL_SESION) == {"pool_size": 5, "max_overflow": 5}
+    # SQLite no admite esos parámetros.
+    assert db._opciones_de_motor("sqlite:///historial.db") == {}
+
+
+def test_la_conexion_directa_de_supabase_avisa_de_que_solo_tiene_ipv6():
+    directa = "postgresql+psycopg://postgres:c@db.abcdef.supabase.co:5432/postgres"
+    pista = db._pista_de_conexion(directa)
+    assert pista is not None and "IPv6" in pista
+    # Con el pooler no hay nada que avisar.
+    assert db._pista_de_conexion(POOL_SESION) is None
+
+
+#: Cadena tal como la copia quien no sustituye el marcador de Supabase. Los
+#: corchetes hacen que `urlsplit` intente leer el anfitrión como una dirección
+#: IPv6 y lance ValueError, así que sirve de caso límite para todo el análisis.
+CON_MARCADOR = "postgresql+psycopg://postgres.ref:[YOUR-PASSWORD]@aws-0-us-west-2.pooler.supabase.com:5432/postgres"
+
+
+def test_una_cadena_con_corchetes_no_tumba_el_servicio():
+    # Un error de configuración desactiva el historial; no impide arrancar.
+    db.cerrar()
+    assert db.inicializar(CON_MARCADOR) is False
+    assert history.disponible() is False
+
+
+def test_ninguna_funcion_de_analisis_revienta_con_una_cadena_ilegible():
+    assert db._partes(CON_MARCADOR) is None
+    # Cada una devuelve algo utilizable en lugar de propagar la excepción.
+    assert db._sanear_parametros(CON_MARCADOR) == CON_MARCADOR
+    assert db._puerto(CON_MARCADOR) is None
+    assert db._usa_pool_de_transaccion(CON_MARCADOR) is False
+    assert db._opciones_de_motor(CON_MARCADOR) == {"pool_size": 5, "max_overflow": 5}
+
+
+def test_los_corchetes_se_explican_en_el_registro():
+    pista = db._pista_de_conexion(CON_MARCADOR)
+    assert pista is not None and "YOUR-PASSWORD" in pista
+
+
+def test_una_cadena_del_pooler_arranca_el_motor_sin_conectar_de_verdad():
+    # Comprueba que las opciones elegidas son válidas para `create_engine`:
+    # un host inexistente falla al conectar, no al construir el motor.
+    db.cerrar()
+    assert db.inicializar(POOL_TRANSACCION.replace("aws-0-us-west-1.pooler.supabase.com", "127.0.0.1")) is False
 
 
 def test_una_url_invalida_no_tumba_el_servicio():

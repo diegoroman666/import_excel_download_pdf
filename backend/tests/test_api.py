@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import io
+import re
 
 import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.descargas import cabecera_descarga
 from app.main import app
 
 
@@ -173,6 +175,46 @@ def test_exportar_respeta_los_filtros(cliente, dataset_id):
         json={"filtros": [{"columna": "Ciudad", "tipo": "categorico", "valores": ["Cusco"]}]},
     )
     assert pd.read_csv(io.BytesIO(respuesta.content)).shape[0] == 4
+
+
+def test_un_nombre_de_archivo_exotico_no_rompe_la_descarga(cliente, csv_bytes):
+    """El nombre lo elige quien sube el archivo, y acaba en una cabecera HTTP.
+
+    Las cabeceras se codifican en latin-1: sin tratar el nombre, un símbolo
+    fuera de ese juego tumbaba la exportación con un error 500. Las comillas,
+    además, permitirían romper el valor de la cabecera.
+    """
+    nombre = 'ventas€ 数据 "raras".csv'
+    subida = cliente.post(
+        "/api/datasets", files={"archivo": (nombre, csv_bytes, "text/csv")}
+    )
+    assert subida.status_code == 200
+
+    respuesta = cliente.post(
+        f"/api/datasets/{subida.json()['metadatos']['dataset_id']}/exportar?formato=csv",
+        json={},
+    )
+    assert respuesta.status_code == 200
+
+    cabecera = respuesta.headers["content-disposition"]
+    # La cabecera entera debe poder codificarse como exige HTTP.
+    cabecera.encode("latin-1")
+
+    # El nombre simple queda en ASCII y sin comillas que rompan el valor…
+    simple = re.search(r'filename="([^"]*)"', cabecera).group(1)
+    assert simple.isascii() and simple.endswith(".csv")
+    # …y el original viaja codificado, para los navegadores que lo entienden.
+    assert "filename*=UTF-8''" in cabecera
+    assert "%E2%82%AC" in cabecera  # el euro, percent-encoded
+
+
+def test_la_cabecera_de_descarga_neutraliza_comillas_y_saltos_de_linea():
+    """Comprobación directa: por HTTP el cliente ya escapa parte de esto."""
+    valor = cabecera_descarga('a"; x="b\r\nc.csv')["Content-Disposition"]
+    # Sólo las dos comillas que delimitan el nombre simple.
+    assert valor.count('"') == 2
+    assert "\r" not in valor and "\n" not in valor
+    valor.encode("latin-1")
 
 
 def test_exportar_informe_incluye_hojas_de_analisis(cliente, dataset_id):
