@@ -37,7 +37,7 @@ Todos los límites se ajustan por variable de entorno (`core/config.py`):
 
 | Variable | Valor por defecto | Descripción |
 |---|---|---|
-| `MAX_UPLOAD_BYTES` | `26214400` (25 MB) | Tamaño máximo del archivo |
+| `MAX_UPLOAD_BYTES` | `26214400` (25 MB) | Tamaño máximo del archivo. Depende de la RAM del alojamiento: `render.yaml` lo baja a 10 MB porque el plan gratuito da 512 MB y Pandas expande el Excel en memoria |
 | `MAX_ROWS` | `200000` | Filas analizadas como máximo |
 | `MAX_COLUMNS` | `200` | Columnas analizadas como máximo |
 | `PREVIEW_ROWS` | `5000` | Filas enviadas al navegador |

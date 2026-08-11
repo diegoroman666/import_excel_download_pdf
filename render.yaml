@@ -37,8 +37,16 @@ services:
       - key: DATABASE_URL
         sync: false
 
+      # 10 MB. El código admite 25 por omisión, pero el plan gratuito de Render
+      # da 512 MB de RAM y un Excel viene comprimido: al abrirlo, Pandas lo
+      # expande varias veces en memoria y el proceso moriría por falta de
+      # espacio, que se ve como un 502 al subir en vez de como un aviso claro.
+      #
+      # Con 10 MB caben de sobra cientos de miles de filas. Si algún día hace
+      # falta más, se sube este valor en el panel de Render —es una variable de
+      # entorno, no hay que tocar el código— o se pasa a un plan con más RAM.
       - key: MAX_UPLOAD_BYTES
-        value: "26214400"
+        value: "10485760"
       # Tamaño máximo de un archivo que se conserva en el historial.
       - key: MAX_BYTES_HISTORIAL
         value: "8388608"
